@@ -1,4 +1,4 @@
-import { Ripgrep } from "../file/ripgrep"
+import path from "path"
 
 import { Instance } from "../project/instance"
 
@@ -15,6 +15,25 @@ import { PermissionNext } from "@/permission/next"
 import { Skill } from "@/skill"
 
 export namespace SystemPrompt {
+  function external(permission: PermissionNext.Ruleset) {
+    return Array.from(
+      new Set(
+        permission
+          .filter((rule) => rule.permission === "external_directory" && rule.action === "allow")
+          .map((rule) => {
+            if (rule.pattern.endsWith("/*")) {
+              return path.normalize(rule.pattern.slice(0, -2))
+            }
+            if (rule.pattern.endsWith("\\*")) {
+              return path.normalize(rule.pattern.slice(0, -2))
+            }
+          })
+          .filter((rule): rule is string => Boolean(rule))
+          .filter((rule) => path.isAbsolute(rule)),
+      ),
+    )
+  }
+
   export function instructions() {
     return PROMPT_CODEX.trim()
   }
@@ -29,8 +48,13 @@ export namespace SystemPrompt {
     return [PROMPT_ANTHROPIC_WITHOUT_TODO]
   }
 
-  export async function environment(model: Provider.Model) {
+  export async function environment(model: Provider.Model, permission: PermissionNext.Ruleset = []) {
     const project = Instance.project
+    const directories = [
+      `  - ${Instance.directory} (working directory)`,
+      ...external(permission).map((item) => `  - ${item} (workspace directory)`),
+    ].join("\n")
+
     return [
       [
         `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
@@ -43,14 +67,7 @@ export namespace SystemPrompt {
         `  Today's date: ${new Date().toDateString()}`,
         `</env>`,
         `<directories>`,
-        `  ${
-          project.vcs === "git" && false
-            ? await Ripgrep.tree({
-                cwd: Instance.directory,
-                limit: 50,
-              })
-            : ""
-        }`,
+        directories,
         `</directories>`,
       ].join("\n"),
     ]

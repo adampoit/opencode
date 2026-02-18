@@ -12,10 +12,19 @@ import fuzzysort from "fuzzysort"
 import { Global } from "../global"
 import { git } from "@/util/git"
 import { Protected } from "./protected"
+import { Session } from "../session"
+import { SessionID } from "../session/schema"
 
 export namespace File {
   const log = Log.create({ service: "file" })
+  type SearchResult = { files: string[]; dirs: string[] }
+  type ExternalCache = { key: string; time: number; value: SearchResult }
+  const EXTERNAL_CACHE_TTL = 2_000
+  const externalCache = new Map<string, ExternalCache>()
 
+  function empty(): SearchResult {
+    return { files: [], dirs: [] }
+  }
   export const Info = z
     .object({
       path: z.string(),
@@ -612,17 +621,106 @@ export namespace File {
     })
   }
 
-  export async function search(input: { query: string; limit?: number; dirs?: boolean; type?: "file" | "directory" }) {
+  function externalDirectory(pattern: string) {
+    if (!pattern.endsWith("/*") && !pattern.endsWith("\\*")) return
+    const result = pattern.slice(0, -2)
+    if (!path.isAbsolute(result)) return
+    if (result.includes("*") || result.includes("?")) return
+    return path.normalize(result)
+  }
+
+  function traversalOnly(input: string) {
+    const parts = input.replaceAll("\\", "/").split("/").filter(Boolean)
+    if (parts.length === 0) return false
+    return parts.every((part) => part === "..")
+  }
+
+  async function external(sessionID?: string) {
+    if (!sessionID) return empty()
+
+    const session = await Session.get(SessionID.make(sessionID)).catch(() => undefined)
+    if (!session?.permission) {
+      externalCache.delete(sessionID)
+      return empty()
+    }
+
+    const dirs = Array.from(
+      new Set(
+        session.permission
+          .filter((rule) => rule.permission === "external_directory" && rule.action === "allow")
+          .map((rule) => externalDirectory(rule.pattern))
+          .filter((rule): rule is string => Boolean(rule)),
+      ),
+    ).toSorted()
+
+    const key = dirs.join("\0")
+    const now = Date.now()
+    const cached = externalCache.get(sessionID)
+    if (cached && cached.key === key && now - cached.time < EXTERNAL_CACHE_TTL) return cached.value
+
+    if (!dirs.length) {
+      const value = empty()
+      externalCache.set(sessionID, { key, time: now, value })
+      return value
+    }
+
+    const files: string[] = []
+    const folders = new Set<string>()
+
+    for (const dir of dirs) {
+      const stat = await Bun.file(dir)
+        .stat()
+        .catch(() => undefined)
+      if (!stat?.isDirectory()) continue
+
+      const root = path.relative(Instance.directory, dir)
+      if (root && root !== "." && !traversalOnly(root)) folders.add(root + "/")
+
+      for await (const file of Ripgrep.files({ cwd: dir })) {
+        const absolute = path.join(dir, file)
+        const relative = path.relative(Instance.directory, absolute)
+        files.push(relative)
+
+        let current = relative
+        while (true) {
+          const parent = path.dirname(current)
+          if (parent === "." || parent === current || traversalOnly(parent)) break
+          current = parent
+          folders.add(parent + "/")
+        }
+      }
+    }
+
+    const value = {
+      files: Array.from(new Set(files)),
+      dirs: Array.from(folders),
+    }
+    externalCache.set(sessionID, { key, time: now, value })
+    return value
+  }
+
+  export async function search(input: {
+    query: string
+    limit?: number
+    dirs?: boolean
+    type?: "file" | "directory"
+    sessionID?: string
+  }) {
     const query = input.query.trim()
     const limit = input.limit ?? 100
     const kind = input.type ?? (input.dirs === false ? "file" : "all")
     log.info("search", { query, kind })
 
-    const result = await state().then((x) => x.files())
+    const root = await state().then((x) => x.files())
+    const extra = await external(input.sessionID)
+    const files = extra.files.length ? Array.from(new Set([...root.files, ...extra.files])) : root.files
+    const dirs = extra.dirs.length ? Array.from(new Set([...root.dirs, ...extra.dirs])) : root.dirs
 
     const hidden = (item: string) => {
       const normalized = item.replaceAll("\\", "/").replace(/\/+$/, "")
-      return normalized.split("/").some((p) => p.startsWith(".") && p.length > 1)
+      return normalized
+        .split("/")
+        .some((part) => part !== "." && part !== ".." && part.startsWith(".") && part.length > 1)
     }
     const preferHidden = query.startsWith(".") || query.includes("/.")
     const sortHiddenLast = (items: string[]) => {
@@ -630,22 +728,20 @@ export namespace File {
       const visible: string[] = []
       const hiddenItems: string[] = []
       for (const item of items) {
-        const isHidden = hidden(item)
-        if (isHidden) hiddenItems.push(item)
-        if (!isHidden) visible.push(item)
+        const value = hidden(item)
+        if (value) hiddenItems.push(item)
+        if (!value) visible.push(item)
       }
       return [...visible, ...hiddenItems]
     }
     if (!query) {
-      if (kind === "file") return result.files.slice(0, limit)
-      return sortHiddenLast(result.dirs.toSorted()).slice(0, limit)
+      if (kind === "file") return files.slice(0, limit)
+      return sortHiddenLast(dirs.toSorted()).slice(0, limit)
     }
 
-    const items =
-      kind === "file" ? result.files : kind === "directory" ? result.dirs : [...result.files, ...result.dirs]
-
+    const items = kind === "file" ? files : kind === "directory" ? dirs : [...files, ...dirs]
     const searchLimit = kind === "directory" && !preferHidden ? limit * 20 : limit
-    const sorted = fuzzysort.go(query, items, { limit: searchLimit }).map((r) => r.target)
+    const sorted = fuzzysort.go(query, items, { limit: searchLimit }).map((item) => item.target)
     const output = kind === "directory" ? sortHiddenLast(sorted).slice(0, limit) : sorted
 
     log.info("search", { query, kind, results: output.length })

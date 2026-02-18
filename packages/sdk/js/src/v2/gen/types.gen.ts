@@ -183,13 +183,6 @@ export type EventLspUpdated = {
   }
 }
 
-export type EventFileEdited = {
-  type: "file.edited"
-  properties: {
-    file: string
-  }
-}
-
 export type OutputFormatText = {
   type: "text"
 }
@@ -882,6 +875,13 @@ export type EventSessionError = {
   }
 }
 
+export type EventFileEdited = {
+  type: "file.edited"
+  properties: {
+    file: string
+  }
+}
+
 export type EventVcsBranchUpdated = {
   type: "vcs.branch.updated"
   properties: {
@@ -971,7 +971,6 @@ export type Event =
   | EventGlobalDisposed
   | EventLspClientDiagnostics
   | EventLspUpdated
-  | EventFileEdited
   | EventMessageUpdated
   | EventMessageRemoved
   | EventMessagePartUpdated
@@ -994,6 +993,7 @@ export type Event =
   | EventSessionDeleted
   | EventSessionDiff
   | EventSessionError
+  | EventFileEdited
   | EventVcsBranchUpdated
   | EventWorkspaceReady
   | EventWorkspaceFailed
@@ -1713,6 +1713,13 @@ export type McpResource = {
   description?: string
   mimeType?: string
   client: string
+}
+
+export type SessionWorkspaceDirectoryResult = {
+  added: boolean
+  directory: string
+  glob: string
+  session: Session
 }
 
 export type TextPartInput = {
@@ -3062,6 +3069,43 @@ export type SessionForkResponses = {
 
 export type SessionForkResponse = SessionForkResponses[keyof SessionForkResponses]
 
+export type SessionWorkspaceDirectoryData = {
+  body?: {
+    path: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/workspace/directory"
+}
+
+export type SessionWorkspaceDirectoryErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionWorkspaceDirectoryError = SessionWorkspaceDirectoryErrors[keyof SessionWorkspaceDirectoryErrors]
+
+export type SessionWorkspaceDirectoryResponses = {
+  /**
+   * Workspace directory added
+   */
+  200: SessionWorkspaceDirectoryResult
+}
+
+export type SessionWorkspaceDirectoryResponse =
+  SessionWorkspaceDirectoryResponses[keyof SessionWorkspaceDirectoryResponses]
+
 export type SessionAbortData = {
   body?: never
   path: {
@@ -4100,6 +4144,7 @@ export type FindFilesData = {
     dirs?: "true" | "false"
     type?: "file" | "directory"
     limit?: number
+    sessionID?: string
   }
   url: "/find/file"
 }
