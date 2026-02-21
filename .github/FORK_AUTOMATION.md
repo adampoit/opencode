@@ -17,7 +17,10 @@ In your fork, configure these repository variables:
 
 ## 3) Add repository secrets
 
+- `FORK_SYNC_TOKEN`: recommended; a PAT with `repo` scope used by sync automation so PR events trigger normal CI checks
 - `CACHIX_AUTH_TOKEN`: optional; required only if you want to push build outputs to Cachix
+
+Without `FORK_SYNC_TOKEN`, the workflow falls back to `GITHUB_TOKEN`. In that mode, the sync PR is created, but downstream `pull_request` workflows may not trigger automatically.
 
 ## 4) Enable repository settings
 

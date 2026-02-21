@@ -35,6 +35,7 @@ jobs:
       - name: Sync latest upstream release into fork branch
         env:
           GH_TOKEN: ${{ github.token }}
+          SYNC_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
           INPUT_TAG: ${{ inputs.tag }}
@@ -45,11 +46,15 @@ jobs:
         run: |
           set -euo pipefail
 
+          TOKEN="${SYNC_TOKEN:-$GH_TOKEN}"
+          export GH_TOKEN="${TOKEN}"
+
           BASE="${INPUT_BASE:-$DEFAULT_BASE}"
 
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
 
+          git remote set-url origin "https://x-access-token:${TOKEN}@github.com/${REPO}.git"
           git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" || true
           git fetch --force upstream "refs/tags/*:refs/tags/*"
           git fetch --force origin "refs/heads/${BASE}:refs/remotes/origin/${BASE}"
