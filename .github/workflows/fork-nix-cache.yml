@@ -1,0 +1,46 @@
+name: fork-nix-cache
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref_name == vars.FORK_SYNC_BASE_BRANCH || (vars.FORK_SYNC_BASE_BRANCH == '' && github.ref_name == github.event.repository.default_branch) || startsWith(github.ref_name, 'sync/upstream-') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+          - runner: macos-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v19
+
+      - name: Enable Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+
+      - name: Login to Cachix
+        if: ${{ vars.CACHIX_CACHE != '' && secrets.CACHIX_AUTH_TOKEN != '' }}
+        uses: cachix/cachix-action@v16
+        with:
+          name: ${{ vars.CACHIX_CACHE }}
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build opencode package
+        run: nix build .#opencode --accept-flake-config --print-build-logs
+
+      - name: Push build output to Cachix
+        if: ${{ vars.CACHIX_CACHE != '' && secrets.CACHIX_AUTH_TOKEN != '' }}
+        run: cachix push "${{ vars.CACHIX_CACHE }}" "$(nix path-info .#opencode)"

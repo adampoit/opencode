@@ -1,0 +1,58 @@
+name: fork-sync-watchdog
+
+on:
+  schedule:
+    - cron: "47 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tag reviewer when sync PR needs humans
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REVIEWER: ${{ vars.FORK_SYNC_REVIEWER }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t PRS < <(gh pr list --state open --label upstream-sync --json number --jq '.[].number')
+
+          if [ "${#PRS[@]}" -eq 0 ]; then
+            echo "No open upstream-sync PRs."
+            exit 0
+          fi
+
+          for PR in "${PRS[@]}"; do
+            JSON="$(gh pr view "${PR}" --json url,mergeable,statusCheckRollup)"
+            MERGEABLE="$(jq -r '.mergeable' <<<"${JSON}")"
+            FAILING="$(jq -r '[.statusCheckRollup[]? | (.conclusion // .state // "" | ascii_upcase) | select(. == "FAILURE" or . == "ERROR" or . == "TIMED_OUT" or . == "CANCELLED" or . == "ACTION_REQUIRED")] | length' <<<"${JSON}")"
+
+            if [ "${MERGEABLE}" != "CONFLICTING" ] && [ "${FAILING}" -eq 0 ]; then
+              continue
+            fi
+
+            FLAGGED="$(gh api "repos/${REPO}/issues/${PR}/comments" --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("[sync-watchdog]")))] | length')"
+            if [ "${FLAGGED}" -gt 0 ]; then
+              continue
+            fi
+
+            URL="$(jq -r '.url' <<<"${JSON}")"
+            MENTION=""
+            if [ -n "${REVIEWER}" ]; then
+              gh pr edit "${PR}" --add-reviewer "${REVIEWER}" || true
+              MENTION="@${REVIEWER} "
+            fi
+
+            gh pr comment "${PR}" --body "[sync-watchdog] ${MENTION}This upstream sync PR needs manual intervention. mergeable=${MERGEABLE}, failing_required_checks=${FAILING}. ${URL}"
+          done
