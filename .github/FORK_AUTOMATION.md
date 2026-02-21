@@ -61,3 +61,50 @@ cachix use <your-cache>
 ```
 
 Magic Nix Cache still helps CI even without Cachix configured.
+
+## 6) Working model: fork integration vs upstream contributions
+
+Use two long-lived bases with different purposes:
+
+- `origin/dev`: your fork integration branch (upstream release sync PRs + your merged feature work)
+- `upstream/dev`: the clean base for PRs you want to send to `anomalyco/opencode`
+
+### Day-to-day fork development
+
+Create feature branches from `origin/dev`, then merge them back into `origin/dev`.
+
+```bash
+git fetch origin upstream
+git switch dev
+git reset --hard origin/dev
+git switch -c feat/my-change
+```
+
+This keeps your feature work compatible with your fork's required checks and release-sync automation.
+
+### Preparing an upstream PR without cherry-picking
+
+When a feature branch (based on `origin/dev`) is ready to propose upstream, create an upstream-ready copy and rebase the whole feature stack onto `upstream/dev`.
+
+```bash
+git fetch origin upstream
+git switch -c feat/my-change-upstream feat/my-change
+BASE=$(git merge-base --fork-point origin/dev feat/my-change || git merge-base origin/dev feat/my-change)
+git rebase --onto upstream/dev "$BASE" feat/my-change-upstream
+git push -u origin feat/my-change-upstream
+```
+
+Open your upstream PR from `adampoit:feat/my-change-upstream` to `anomalyco/opencode:dev`.
+
+Notes:
+
+- This rebases the branch in one operation; no per-commit cherry-picking is needed.
+- Keep your original `feat/my-change` branch unchanged for fork-only CI/review if needed.
+- If `upstream/dev` moves while the PR is open, rebase `feat/my-change-upstream` onto latest `upstream/dev` and force-push with lease:
+
+```bash
+git fetch upstream
+git switch feat/my-change-upstream
+git rebase upstream/dev
+git push --force-with-lease
+```
