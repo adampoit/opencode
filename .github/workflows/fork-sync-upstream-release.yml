@@ -51,7 +51,7 @@ jobs:
           git config user.name "github-actions[bot]"
 
           git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" || true
-          git fetch --force upstream --tags
+          git fetch --force upstream "refs/tags/*:refs/tags/*"
           git fetch --force origin "refs/heads/${BASE}:refs/remotes/origin/${BASE}"
 
           if [ -n "${INPUT_TAG}" ]; then
@@ -79,11 +79,11 @@ jobs:
 
           git push --force-with-lease origin "${SHA}:refs/heads/${SYNC_BRANCH}"
 
-          if ! gh label list --json name --jq '.[].name' | grep -qx "upstream-sync"; then
-            gh label create "upstream-sync" --color "1d76db" --description "Automated upstream release sync"
+          if ! gh label list -R "${REPO}" --json name --jq '.[].name' | grep -qx "upstream-sync"; then
+            gh label create -R "${REPO}" "upstream-sync" --color "1d76db" --description "Automated upstream release sync"
           fi
 
-          PR="$(gh pr list --state open --base "${BASE}" --head "${OWNER}:${SYNC_BRANCH}" --json number --jq '.[0].number // empty')"
+          PR="$(gh pr list -R "${REPO}" --state open --base "${BASE}" --head "${OWNER}:${SYNC_BRANCH}" --json number --jq '.[0].number // empty')"
 
           BODY="$(printf '%s\n' \
             '## Summary' \
@@ -97,33 +97,34 @@ jobs:
 
           if [ -z "${PR}" ]; then
             gh pr create \
+              -R "${REPO}" \
               --base "${BASE}" \
               --head "${SYNC_BRANCH}" \
               --title "chore(sync): merge upstream ${TAG} into ${BASE}" \
               --body "${BODY}"
-            PR="$(gh pr list --state open --base "${BASE}" --head "${OWNER}:${SYNC_BRANCH}" --json number --jq '.[0].number')"
+            PR="$(gh pr list -R "${REPO}" --state open --base "${BASE}" --head "${OWNER}:${SYNC_BRANCH}" --json number --jq '.[0].number')"
           else
-            gh pr edit "${PR}" \
+            gh pr edit -R "${REPO}" "${PR}" \
               --title "chore(sync): merge upstream ${TAG} into ${BASE}" \
               --body "${BODY}"
           fi
 
-          gh pr edit "${PR}" --add-label "upstream-sync"
+          gh pr edit -R "${REPO}" "${PR}" --add-label "upstream-sync"
 
-          if gh pr merge "${PR}" --auto --merge; then
+          if gh pr merge -R "${REPO}" "${PR}" --auto --merge; then
             echo "Enabled auto-merge for PR #${PR}."
             exit 0
           fi
 
-          MERGEABLE="$(gh pr view "${PR}" --json mergeable --jq '.mergeable')"
+          MERGEABLE="$(gh pr view -R "${REPO}" "${PR}" --json mergeable --jq '.mergeable')"
           FLAGGED="$(gh api "repos/${REPO}/issues/${PR}/comments" --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("[sync-watchdog]")))] | length')"
 
           if [ "${FLAGGED}" -eq 0 ]; then
             MENTION=""
             if [ -n "${REVIEWER}" ]; then
-              gh pr edit "${PR}" --add-reviewer "${REVIEWER}" || true
+              gh pr edit -R "${REPO}" "${PR}" --add-reviewer "${REVIEWER}" || true
               MENTION="@${REVIEWER} "
             fi
 
-            gh pr comment "${PR}" --body "[sync-watchdog] ${MENTION}Auto-merge could not be enabled (mergeable=${MERGEABLE}). Please review this sync PR."
+            gh pr comment -R "${REPO}" "${PR}" --body "[sync-watchdog] ${MENTION}Auto-merge could not be enabled (mergeable=${MERGEABLE}). Please review this sync PR."
           fi
