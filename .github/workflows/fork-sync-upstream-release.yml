@@ -83,7 +83,7 @@ jobs:
             gh label create -R "${REPO}" "upstream-sync" --color "1d76db" --description "Automated upstream release sync"
           fi
 
-          PR="$(gh pr list -R "${REPO}" --state open --base "${BASE}" --head "${OWNER}:${SYNC_BRANCH}" --json number --jq '.[0].number // empty')"
+          PR="$(gh pr list -R "${REPO}" --state open --base "${BASE}" --head "${SYNC_BRANCH}" --json number --jq '.[0].number // empty')"
 
           BODY="$(printf '%s\n' \
             '## Summary' \
@@ -102,11 +102,16 @@ jobs:
               --head "${SYNC_BRANCH}" \
               --title "chore(sync): merge upstream ${TAG} into ${BASE}" \
               --body "${BODY}"
-            PR="$(gh pr list -R "${REPO}" --state open --base "${BASE}" --head "${OWNER}:${SYNC_BRANCH}" --json number --jq '.[0].number')"
+            PR="$(gh pr list -R "${REPO}" --state open --base "${BASE}" --head "${SYNC_BRANCH}" --json number --jq '.[0].number // empty')"
           else
             gh pr edit -R "${REPO}" "${PR}" \
               --title "chore(sync): merge upstream ${TAG} into ${BASE}" \
               --body "${BODY}"
+          fi
+
+          if [ -z "${PR}" ]; then
+            echo "::error::Failed to resolve sync PR number"
+            exit 1
           fi
 
           gh pr edit -R "${REPO}" "${PR}" --add-label "upstream-sync"
