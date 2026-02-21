@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   build:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.ref_name == vars.FORK_SYNC_BASE_BRANCH || (vars.FORK_SYNC_BASE_BRANCH == '' && github.ref_name == github.event.repository.default_branch) || startsWith(github.ref_name, 'sync/upstream-') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref_name == 'dev' || startsWith(github.ref_name, 'sync/upstream-') }}
     strategy:
       fail-fast: false
       matrix:

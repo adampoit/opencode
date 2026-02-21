@@ -2,15 +2,16 @@
 
 This setup keeps a private fork branch synced with upstream `anomalyco/opencode` releases, auto-merges clean sync PRs, and tags a reviewer when manual intervention is needed.
 
-## 1) Create your long-lived fork branch
+## 1) Pick your integration branch
 
-Use a branch that carries your private changes (example: `private/dev`).
+Use your fork `dev` branch as the integration branch.
+
+This fork setup assumes `dev` for required checks and branch protection.
 
 ## 2) Add repository variables
 
 In your fork, configure these repository variables:
 
-- `FORK_SYNC_BASE_BRANCH`: target branch in your fork (for example `private/dev`)
 - `FORK_SYNC_UPSTREAM_REPO`: upstream repo (default: `anomalyco/opencode`)
 - `FORK_SYNC_REVIEWER`: GitHub username to request review from when automation cannot complete (without `@`)
 - `CACHIX_CACHE`: optional Cachix cache name for Nix artifacts (recommended for faster local installs)
@@ -25,7 +26,7 @@ Without `FORK_SYNC_TOKEN`, the workflow falls back to `GITHUB_TOKEN`. In that mo
 ## 4) Enable repository settings
 
 - Enable **Allow auto-merge** in repository settings.
-- Add branch protection rules for `FORK_SYNC_BASE_BRANCH` and require CI checks you care about (for example `test`, `nix-eval`).
+- Add branch protection rules for `dev` and require CI checks you care about (for example `test`, `nix-eval`).
 
 With this in place:
 
