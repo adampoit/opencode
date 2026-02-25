@@ -18,10 +18,14 @@ In your fork, configure these repository variables:
 
 ## 3) Add repository secrets
 
-- `FORK_SYNC_TOKEN`: recommended; a PAT with `repo` scope used by sync automation so PR events trigger normal CI checks
+- `FORK_SYNC_TOKEN`: recommended; a PAT used by sync automation so PR events trigger normal CI checks
+  - classic PAT: grant `repo` and `workflow`
+  - fine-grained PAT: grant `Contents` (Read and write), `Pull requests` (Read and write), and `Workflows` (Read and write)
 - `CACHIX_AUTH_TOKEN`: optional; required only if you want to push build outputs to Cachix
 
 Without `FORK_SYNC_TOKEN`, the workflow falls back to `GITHUB_TOKEN`. In that mode, the sync PR is created, but downstream `pull_request` workflows may not trigger automatically.
+
+If `FORK_SYNC_TOKEN` is present but cannot update workflow files, the sync job retries the branch push with `GITHUB_TOKEN`.
 
 ## 4) Enable repository settings
 
@@ -30,8 +34,9 @@ Without `FORK_SYNC_TOKEN`, the workflow falls back to `GITHUB_TOKEN`. In that mo
 
 With this in place:
 
-- `.github/workflows/fork-sync-upstream-release.yml` creates a PR from each new upstream release tag.
+- `.github/workflows/fork-sync-upstream-release.yml` keeps one rolling PR on `sync/upstream-release` and force-updates it to the latest upstream release tag.
 - It enables auto-merge when checks pass.
+- It closes older `upstream-sync` PRs from legacy tag-specific branches as superseded.
 - `.github/workflows/fork-sync-watchdog.yml` requests your review if conflicts or failing checks block the sync.
 - `.github/workflows/fork-nix-cache.yml` uses Magic Nix Cache to speed up CI and can optionally push to Cachix.
 
