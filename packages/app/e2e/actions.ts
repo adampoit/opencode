@@ -328,8 +328,13 @@ export async function withSession<T>(
   try {
     return await callback(session)
   } finally {
-    await sdk.session.delete({ sessionID: session.id }).catch(() => undefined)
+    await cleanupSession(sdk, session.id)
   }
+}
+
+export async function cleanupSession(sdk: ReturnType<typeof createSdk>, sessionID: string) {
+  await sdk.session.abort({ sessionID }).catch(() => undefined)
+  await sdk.session.delete({ sessionID }).catch(() => undefined)
 }
 
 const seedSystem = [

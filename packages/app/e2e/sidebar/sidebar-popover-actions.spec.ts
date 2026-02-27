@@ -1,5 +1,5 @@
 import { test, expect } from "../fixtures"
-import { closeSidebar, hoverSessionItem } from "../actions"
+import { cleanupSession, closeSidebar, hoverSessionItem } from "../actions"
 import { projectSwitchSelector, sessionItemSelector } from "../selectors"
 
 test("collapsed sidebar popover stays open when archiving a session", async ({ page, slug, sdk, gotoSession }) => {
@@ -30,7 +30,6 @@ test("collapsed sidebar popover stays open when archiving a session", async ({ p
 
     await expect(page.locator(sessionItemSelector(two.id)).first()).toBeVisible()
   } finally {
-    await sdk.session.delete({ sessionID: one.id }).catch(() => undefined)
-    await sdk.session.delete({ sessionID: two.id }).catch(() => undefined)
+    await Promise.all([cleanupSession(sdk, one.id), cleanupSession(sdk, two.id)])
   }
 })
