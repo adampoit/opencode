@@ -13,8 +13,16 @@ concurrency:
 
 jobs:
   unit:
-    name: unit (linux)
-    runs-on: ubuntu-latest
+    name: unit (${{ matrix.settings.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - name: linux
+            host: ubuntu-latest
+          - name: windows
+            host: windows-latest
+    runs-on: ${{ matrix.settings.host }}
     defaults:
       run:
         shell: bash

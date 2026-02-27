@@ -225,7 +225,7 @@ export async function hoverSessionItem(page: Page, sessionID: string) {
 export async function openSessionMoreMenu(page: Page, sessionID: string) {
   await expect(page).toHaveURL(new RegExp(`/session/${sessionID}(?:[/?#]|$)`))
 
-  const scroller = page.locator(".session-scroller").first()
+  const scroller = page.locator(".scroll-view__viewport").first()
   await expect(scroller).toBeVisible()
   await expect(scroller.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30_000 })
 
@@ -328,8 +328,13 @@ export async function withSession<T>(
   try {
     return await callback(session)
   } finally {
-    await sdk.session.delete({ sessionID: session.id }).catch(() => undefined)
+    await cleanupSession(sdk, session.id)
   }
+}
+
+export async function cleanupSession(sdk: ReturnType<typeof createSdk>, sessionID: string) {
+  await sdk.session.abort({ sessionID }).catch(() => undefined)
+  await sdk.session.delete({ sessionID }).catch(() => undefined)
 }
 
 const seedSystem = [

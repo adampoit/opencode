@@ -1,6 +1,6 @@
 import { test, expect } from "../fixtures"
 import { promptSelector } from "../selectors"
-import { sessionIDFromUrl } from "../actions"
+import { cleanupSession, sessionIDFromUrl } from "../actions"
 
 // Regression test for Issue #12453: the synchronous POST /message endpoint holds
 // the connection open while the agent works, causing "Failed to fetch" over
@@ -38,6 +38,6 @@ test("prompt succeeds when sync message endpoint is unreachable", async ({ page,
       )
       .toContain(token)
   } finally {
-    await sdk.session.delete({ sessionID }).catch(() => undefined)
+    await cleanupSession(sdk, sessionID)
   }
 })

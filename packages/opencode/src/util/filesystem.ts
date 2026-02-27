@@ -2,7 +2,7 @@ import { chmod, mkdir, readFile, writeFile } from "fs/promises"
 import { createWriteStream, existsSync, statSync } from "fs"
 import { lookup } from "mime-types"
 import { realpathSync } from "fs"
-import { dirname, join, relative } from "path"
+import { dirname, isAbsolute, join, relative, resolve } from "path"
 import { Readable } from "stream"
 import { pipeline } from "stream/promises"
 import { Glob } from "./glob"
@@ -113,6 +113,18 @@ export namespace Filesystem {
     }
   }
 
+  export function windowsPath(p: string): string {
+    if (process.platform !== "win32") return p
+    return (
+      p
+        // Git Bash for Windows paths are typically /<drive>/...
+        .replace(/^\/([a-zA-Z])\//, (_, drive) => `${drive.toUpperCase()}:/`)
+        // Cygwin git paths are typically /cygdrive/<drive>/...
+        .replace(/^\/cygdrive\/([a-zA-Z])\//, (_, drive) => `${drive.toUpperCase()}:/`)
+        // WSL paths are typically /mnt/<drive>/...
+        .replace(/^\/mnt\/([a-zA-Z])\//, (_, drive) => `${drive.toUpperCase()}:/`)
+    )
+  }
   export function overlaps(a: string, b: string) {
     const relA = relative(a, b)
     const relB = relative(b, a)
@@ -120,7 +132,8 @@ export namespace Filesystem {
   }
 
   export function contains(parent: string, child: string) {
-    return !relative(parent, child).startsWith("..")
+    const rel = relative(resolve(parent), resolve(child))
+    return !rel || (!rel.startsWith("..") && !isAbsolute(rel))
   }
 
   export async function findUp(target: string, start: string, stop?: string) {
