@@ -387,7 +387,8 @@ export namespace File {
       }
 
       const set = new Set<string>()
-      for await (const file of Ripgrep.files({ cwd: Instance.directory })) {
+      const list = await Array.fromAsync(Ripgrep.files({ cwd: Instance.directory })).catch(() => [])
+      for (const file of list) {
         result.files.push(file)
         let current = file
         while (true) {
