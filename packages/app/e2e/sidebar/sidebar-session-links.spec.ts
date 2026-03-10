@@ -1,5 +1,5 @@
 import { test, expect } from "../fixtures"
-import { cleanupSession, openSidebar, withSession } from "../actions"
+import { cleanupSession, openSidebar } from "../actions"
 import { promptSelector } from "../selectors"
 
 test("sidebar session links navigate to the selected session", async ({ page, slug, sdk, gotoSession }) => {
@@ -24,7 +24,6 @@ test("sidebar session links navigate to the selected session", async ({ page, sl
     await expect(page.locator(promptSelector)).toBeVisible()
     await expect(page.locator(`[data-session-id="${two.id}"] a`).first()).toHaveClass(/\bactive\b/)
   } finally {
-    await cleanupSession({ sdk, sessionID: one.id })
-    await cleanupSession({ sdk, sessionID: two.id })
+    await Promise.all([cleanupSession({ sdk, sessionID: one.id }), cleanupSession({ sdk, sessionID: two.id })])
   }
 })

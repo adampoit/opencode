@@ -33,7 +33,6 @@ test("collapsed sidebar popover stays open when archiving a session", async ({ p
 
     await expect(twoItem).toBeVisible()
   } finally {
-    await cleanupSession({ sdk, sessionID: one.id })
-    await cleanupSession({ sdk, sessionID: two.id })
+    await Promise.all([cleanupSession({ sdk, sessionID: one.id }), cleanupSession({ sdk, sessionID: two.id })])
   }
 })

@@ -1,6 +1,6 @@
 import { test, expect } from "../fixtures"
 import { promptSelector } from "../selectors"
-import { cleanupSession, sessionIDFromUrl, withSession } from "../actions"
+import { cleanupSession, sessionIDFromUrl } from "../actions"
 
 test("can send a prompt and receive a reply", async ({ page, sdk, gotoSession }) => {
   test.setTimeout(120_000)
