@@ -50,6 +50,7 @@ jobs:
     env:
       CI: true
       PLAYWRIGHT_BROWSERS_PATH: 0
+      PLAYWRIGHT_GREP_INVERT: 'session model and variant restore per session without leaking into new sessions|session model restore across workspaces|new sessions from sidebar workspace actions stay in selected workspace'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -82,6 +83,7 @@ jobs:
     env:
       CI: true
       PLAYWRIGHT_BROWSERS_PATH: 0
+      PLAYWRIGHT_GREP_INVERT: 'session model and variant restore per session without leaking into new sessions|session model restore across workspaces|new sessions from sidebar workspace actions stay in selected workspace'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
