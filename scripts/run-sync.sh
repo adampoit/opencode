@@ -168,7 +168,7 @@ PY
 
 log "Creating sync branch ${sync_branch} from ${BASE_BRANCH}"
 git checkout -B "$sync_branch" "${ORIGIN_REMOTE_NAME}/${BASE_BRANCH}"
-git merge --no-ff --no-edit "$release_tag"
+git merge --no-ff --no-commit "$release_tag"
 
 if [[ -n "$POLICY_SCRIPT" ]]; then
   if [[ ! -f "$POLICY_SCRIPT" ]]; then
@@ -176,17 +176,21 @@ if [[ -n "$POLICY_SCRIPT" ]]; then
   fi
 
   log "Applying fork policy via ${POLICY_SCRIPT}"
-  bash "$POLICY_SCRIPT"
-
-  if [[ -n "$(git status --porcelain)" ]]; then
-    git add -A
-    git commit -m "chore: apply fork policy for ${release_tag}"
-  else
-    log "Policy script produced no tracked changes."
-  fi
+  env \
+    BASE_BRANCH="$BASE_BRANCH" \
+    ORIGIN_REMOTE_NAME="$ORIGIN_REMOTE_NAME" \
+    RELEASE_TAG="$release_tag" \
+    SYNC_BRANCH="$sync_branch" \
+    UPSTREAM_OWNER="$UPSTREAM_OWNER" \
+    UPSTREAM_REPO="$UPSTREAM_REPO" \
+    UPSTREAM_REMOTE_NAME="$UPSTREAM_REMOTE_NAME" \
+    bash "$POLICY_SCRIPT"
 else
   log "No policy script configured; skipping policy step."
 fi
+
+git add -A
+git commit --no-edit --allow-empty
 
 write_output sync_branch "$sync_branch"
 

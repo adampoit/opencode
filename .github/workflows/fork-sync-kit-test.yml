@@ -29,6 +29,6 @@ jobs:
       sync_branch_prefix: sync/upstream-release
       pr_labels: upstream-sync
       pr_title: Sync upstream release {tag}
-      policy_script: ""
+      policy_script: ci/fork-policy.sh
       merge_method: merge
       dry_run: ${{ inputs.dry_run }}
