@@ -187,7 +187,11 @@ PY
 
 log "Creating sync branch ${sync_branch} from ${BASE_BRANCH}"
 git checkout -B "$sync_branch" "${ORIGIN_REMOTE_NAME}/${BASE_BRANCH}"
-git merge --no-ff --no-commit "$release_tag"
+merge_had_conflicts=false
+if ! git merge --no-ff --no-commit "$release_tag"; then
+  merge_had_conflicts=true
+  log "Merge reported conflicts; applying fork policy before deciding whether to fail."
+fi
 
 if [[ -n "$POLICY_SCRIPT" ]]; then
   if [[ ! -f "$POLICY_SCRIPT" ]]; then
@@ -210,6 +214,15 @@ fi
 
 git add -A
 git rm --cached --quiet --force --ignore-unmatch .fork-sync-kit
+
+if $merge_had_conflicts; then
+  unmerged_files="$(git diff --name-only --diff-filter=U)"
+  if [[ -n "$unmerged_files" ]]; then
+    printf 'Unresolved merge conflicts remain:\n%s\n' "$unmerged_files" >&2
+    exit 1
+  fi
+fi
+
 git commit --no-edit --allow-empty
 
 write_output sync_branch "$sync_branch"
