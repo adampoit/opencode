@@ -33,6 +33,10 @@ import { iife } from "@/util/iife"
 export namespace Session {
   const log = Log.create({ service: "session" })
 
+  const isForeignKeyConstraint = (error: unknown) => {
+    return !!error && typeof error === "object" && "code" in error && error.code === "SQLITE_CONSTRAINT_FOREIGNKEY"
+  }
+
   const parentTitlePrefix = "New session - "
   const childTitlePrefix = "Child session - "
 
@@ -498,7 +502,10 @@ export namespace Session {
           .where(eq(SessionTable.id, input.sessionID))
           .returning()
           .get()
-        if (!row) throw new NotFoundError({ message: `Session not found: ${input.sessionID}` })
+        if (!row) {
+          log.info("skipping summary update for deleted session", { sessionID: input.sessionID })
+          return
+        }
         const info = fromRow(row)
         Database.effect(() => Bus.publish(Event.Updated, { info }))
         return info
@@ -679,22 +686,27 @@ export namespace Session {
   export const updateMessage = fn(MessageV2.Info, async (msg) => {
     const time_created = msg.time.created
     const { id, sessionID, ...data } = msg
-    Database.use((db) => {
-      db.insert(MessageTable)
-        .values({
-          id,
-          session_id: sessionID,
-          time_created,
-          data,
-        })
-        .onConflictDoUpdate({ target: MessageTable.id, set: { data } })
-        .run()
-      Database.effect(() =>
-        Bus.publish(MessageV2.Event.Updated, {
-          info: msg,
-        }),
-      )
-    })
+    try {
+      Database.use((db) => {
+        db.insert(MessageTable)
+          .values({
+            id,
+            session_id: sessionID,
+            time_created,
+            data,
+          })
+          .onConflictDoUpdate({ target: MessageTable.id, set: { data } })
+          .run()
+        Database.effect(() =>
+          Bus.publish(MessageV2.Event.Updated, {
+            info: msg,
+          }),
+        )
+      })
+    } catch (error) {
+      if (!isForeignKeyConstraint(error)) throw error
+      log.info("dropping message update for deleted session", { sessionID, messageID: id })
+    }
     return msg
   })
 
@@ -748,23 +760,28 @@ export namespace Session {
   export const updatePart = fn(UpdatePartInput, async (part) => {
     const { id, messageID, sessionID, ...data } = part
     const time = Date.now()
-    Database.use((db) => {
-      db.insert(PartTable)
-        .values({
-          id,
-          message_id: messageID,
-          session_id: sessionID,
-          time_created: time,
-          data,
-        })
-        .onConflictDoUpdate({ target: PartTable.id, set: { data } })
-        .run()
-      Database.effect(() =>
-        Bus.publish(MessageV2.Event.PartUpdated, {
-          part: structuredClone(part),
-        }),
-      )
-    })
+    try {
+      Database.use((db) => {
+        db.insert(PartTable)
+          .values({
+            id,
+            message_id: messageID,
+            session_id: sessionID,
+            time_created: time,
+            data,
+          })
+          .onConflictDoUpdate({ target: PartTable.id, set: { data } })
+          .run()
+        Database.effect(() =>
+          Bus.publish(MessageV2.Event.PartUpdated, {
+            part: structuredClone(part),
+          }),
+        )
+      })
+    } catch (error) {
+      if (!isForeignKeyConstraint(error)) throw error
+      log.info("dropping part update for deleted session", { sessionID, messageID, partID: id })
+    }
     return part
   })
 
