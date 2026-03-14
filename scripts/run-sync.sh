@@ -48,6 +48,16 @@ safe_tag_name() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^0-9a-z._-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
 }
 
+repo_slug_from_remote_url() {
+  local remote_url="$1"
+  remote_url="${remote_url%.git}"
+  remote_url="${remote_url#git@github.com:}"
+  remote_url="${remote_url#ssh://git@github.com/}"
+  remote_url="${remote_url#https://github.com/}"
+  remote_url="${remote_url#http://github.com/}"
+  printf '%s' "$remote_url"
+}
+
 merge_flag_for_method() {
   case "$1" in
   merge)
@@ -83,6 +93,7 @@ DRY_RUN="${DRY_RUN:-false}"
 ORIGIN_REMOTE_NAME="${ORIGIN_REMOTE_NAME:-origin}"
 UPSTREAM_REMOTE_NAME="${UPSTREAM_REMOTE_NAME:-upstream}"
 UPSTREAM_REMOTE_URL="${UPSTREAM_REMOTE_URL:-https://github.com/${UPSTREAM_OWNER}/${UPSTREAM_REPO}.git}"
+GH_REPO="${GH_REPO:-${GITHUB_REPOSITORY:-}}"
 
 release_tag=""
 release_url=""
@@ -98,6 +109,14 @@ if git remote get-url "$UPSTREAM_REMOTE_NAME" >/dev/null 2>&1; then
   git remote set-url "$UPSTREAM_REMOTE_NAME" "$UPSTREAM_REMOTE_URL"
 else
   git remote add "$UPSTREAM_REMOTE_NAME" "$UPSTREAM_REMOTE_URL"
+fi
+
+if [[ -z "$GH_REPO" ]]; then
+  GH_REPO="$(repo_slug_from_remote_url "$(git remote get-url "$ORIGIN_REMOTE_NAME")")"
+fi
+
+if [[ -z "$GH_REPO" || "$GH_REPO" != */* ]]; then
+  fail "Failed to determine the fork repository slug for gh commands."
 fi
 
 git fetch --no-tags "$ORIGIN_REMOTE_NAME" "+refs/heads/${BASE_BRANCH}:refs/remotes/${ORIGIN_REMOTE_NAME}/${BASE_BRANCH}"
@@ -230,31 +249,32 @@ if [[ -n "$PR_LABELS" ]]; then
   done
 fi
 
-existing_json="$(gh pr list --state open --head "$sync_branch" --base "$BASE_BRANCH" --json number,url | jq '.[0] // empty')"
+existing_json="$(gh pr list --repo "$GH_REPO" --state open --head "$sync_branch" --base "$BASE_BRANCH" --json number,url | jq '.[0] // empty')"
 if [[ -n "$existing_json" ]]; then
   pr_number="$(jq -r '.number' <<<"$existing_json")"
   pr_url="$(jq -r '.url' <<<"$existing_json")"
-  gh pr edit "$pr_number" --title "$pr_title" --body-file "$body_file" >/dev/null
+  gh pr edit "$pr_number" --repo "$GH_REPO" --title "$pr_title" --body-file "$body_file" >/dev/null
   if [[ ${#label_edit_args[@]} -gt 0 ]]; then
-    gh pr edit "$pr_number" "${label_edit_args[@]}" >/dev/null
+    gh pr edit "$pr_number" --repo "$GH_REPO" "${label_edit_args[@]}" >/dev/null
   fi
   status="updated"
   log "Updated PR #${pr_number}"
 else
   gh pr create \
+    --repo "$GH_REPO" \
     --base "$BASE_BRANCH" \
     --head "$sync_branch" \
     --title "$pr_title" \
     --body-file "$body_file" \
     "${label_args[@]}" >/dev/null
-  pr_number="$(gh pr list --state open --head "$sync_branch" --base "$BASE_BRANCH" --json number --jq '.[0].number')"
-  pr_url="$(gh pr view "$pr_number" --json url --jq '.url')"
+  pr_number="$(gh pr list --repo "$GH_REPO" --state open --head "$sync_branch" --base "$BASE_BRANCH" --json number --jq '.[0].number')"
+  pr_url="$(gh pr view "$pr_number" --repo "$GH_REPO" --json url --jq '.url')"
   status="created"
   log "Created PR #${pr_number}"
 fi
 
 merge_flag="$(merge_flag_for_method "$MERGE_METHOD")"
-gh pr merge "$pr_number" --auto "$merge_flag" >/dev/null
+gh pr merge "$pr_number" --repo "$GH_REPO" --auto "$merge_flag" >/dev/null
 
 write_output pr_number "$pr_number"
 write_output pr_url "$pr_url"
