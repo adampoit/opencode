@@ -32,3 +32,5 @@ jobs:
       policy_script: ci/fork-policy.sh
       merge_method: merge
       dry_run: ${{ inputs.dry_run }}
+    secrets:
+      token: ${{ secrets.FORK_SYNC_TOKEN }}
