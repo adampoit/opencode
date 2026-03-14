@@ -53,6 +53,10 @@ export default function Layout(props: ParentProps) {
     }
 
     const current = params.dir
+    batch(() => {
+      setState("invalid", "")
+      setState("resolved", raw)
+    })
     globalSDK
       .createClient({
         directory: raw,
@@ -72,10 +76,6 @@ export default function Layout(props: ParentProps) {
       })
       .catch(() => {
         if (params.dir !== current) return
-        batch(() => {
-          setState("invalid", "")
-          setState("resolved", raw)
-        })
       })
   })
 
