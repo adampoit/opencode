@@ -190,7 +190,7 @@ else
 fi
 
 git add -A
-git rm --cached --quiet --ignore-unmatch .fork-sync-kit
+git rm --cached --quiet --force --ignore-unmatch .fork-sync-kit
 git commit --no-edit --allow-empty
 
 write_output sync_branch "$sync_branch"
