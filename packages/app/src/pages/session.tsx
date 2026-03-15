@@ -473,6 +473,13 @@ export default function Page() {
     if (path) file.load(path)
   })
 
+  // Sync session model on initial mount if there's already a last user message
+  // This prevents race conditions where the model state hasn't been restored yet
+  onMount(() => {
+    const msg = lastUserMessage()
+    if (msg) syncSessionModel(local, msg)
+  })
+
   createEffect(
     on(
       () => lastUserMessage()?.id,
