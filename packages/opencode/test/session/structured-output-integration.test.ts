@@ -50,6 +50,7 @@ describe("StructuredOutput Integration", () => {
         })
 
         // Verify structured output was captured (only on assistant messages)
+        if (!result) throw new Error("expected result to exist")
         expect(result.info.role).toBe("assistant")
         if (result.info.role === "assistant") {
           expect(result.info.structured).toBeDefined()
@@ -108,6 +109,7 @@ describe("StructuredOutput Integration", () => {
         })
 
         // Verify structured output was captured (only on assistant messages)
+        if (!result) throw new Error("expected result to exist")
         expect(result.info.role).toBe("assistant")
         if (result.info.role === "assistant") {
           expect(result.info.structured).toBeDefined()
@@ -152,6 +154,7 @@ describe("StructuredOutput Integration", () => {
         })
 
         // Verify no structured output (text mode) and no error
+        if (!result) throw new Error("expected result to exist")
         expect(result.info.role).toBe("assistant")
         if (result.info.role === "assistant") {
           expect(result.info.structured).toBeUndefined()

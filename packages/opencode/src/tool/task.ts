@@ -143,6 +143,9 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         parts: promptParts,
       })
 
+      if (!result) {
+        throw new Error("Session not found or was deleted during task execution")
+      }
       const text = result.parts.findLast((x) => x.type === "text")?.text ?? ""
 
       const output = [

@@ -970,6 +970,9 @@ export const GithubRunCommand = cmd({
         })
 
         // result should always be assistant just satisfying type checker
+        if (!result) {
+          throw new Error("Session not found or was deleted during processing")
+        }
         if (result.info.role === "assistant" && result.info.error) {
           const err = result.info.error
           console.error("Agent error:", err)
@@ -1005,6 +1008,9 @@ export const GithubRunCommand = cmd({
           ],
         })
 
+        if (!summary) {
+          throw new Error("Session not found or was deleted during summary")
+        }
         if (summary.info.role === "assistant" && summary.info.error) {
           const err = summary.info.error
           console.error("Summary agent error:", err)

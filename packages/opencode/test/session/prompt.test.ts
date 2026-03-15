@@ -35,7 +35,6 @@ describe("session.prompt missing file", () => {
           agent: "build",
           noReply: true,
           parts: [
-            { type: "text", text: "please review @does-not-exist.ts" },
             {
               type: "file",
               mime: "text/plain",
@@ -45,6 +44,7 @@ describe("session.prompt missing file", () => {
           ],
         })
 
+        if (!msg) throw new Error("expected message to exist")
         if (msg.info.role !== "user") throw new Error("expected user message")
 
         const hasFailure = msg.parts.some(
@@ -90,6 +90,7 @@ describe("session.prompt missing file", () => {
           ],
         })
 
+        if (!msg) throw new Error("expected message to exist")
         if (msg.info.role !== "user") throw new Error("expected user message")
 
         const stored = await MessageV2.get({
@@ -137,6 +138,7 @@ describe("session.prompt special characters", () => {
           parts,
           noReply: true,
         })
+        if (!message) throw new Error("expected message to exist")
         const stored = await MessageV2.get({ sessionID: session.id, messageID: message.info.id })
         const textParts = stored.parts.filter((part) => part.type === "text")
         const hasContent = textParts.some((part) => part.text.includes("special content"))
@@ -178,6 +180,7 @@ describe("session.prompt agent variant", () => {
             noReply: true,
             parts: [{ type: "text", text: "hello" }],
           })
+          if (!other) throw new Error("expected message to exist")
           if (other.info.role !== "user") throw new Error("expected user message")
           expect(other.info.variant).toBeUndefined()
 
@@ -187,6 +190,7 @@ describe("session.prompt agent variant", () => {
             noReply: true,
             parts: [{ type: "text", text: "hello again" }],
           })
+          if (!match) throw new Error("expected message to exist")
           if (match.info.role !== "user") throw new Error("expected user message")
           expect(match.info.model).toEqual({ providerID: ProviderID.make("openai"), modelID: ModelID.make("gpt-5.2") })
           expect(match.info.variant).toBe("xhigh")
@@ -198,6 +202,7 @@ describe("session.prompt agent variant", () => {
             variant: "high",
             parts: [{ type: "text", text: "hello third" }],
           })
+          if (!override) throw new Error("expected message to exist")
           if (override.info.role !== "user") throw new Error("expected user message")
           expect(override.info.variant).toBe("high")
 
