@@ -1750,7 +1750,10 @@ export default function Layout(props: ParentProps) {
     const dirs = [local, ...(project.sandboxes ?? [])]
     const active = currentProject()
     const directory = active?.worktree === project.worktree ? currentDir() : undefined
-    const extra = directory && directory !== local && !dirs.includes(directory) ? directory : undefined
+    const known = new Set(dirs.map(workspaceKey))
+    const extra = directory && workspaceKey(directory) !== workspaceKey(local) && !known.has(workspaceKey(directory))
+      ? directory
+      : undefined
     const pending = extra ? WorktreeState.get(extra)?.status === "pending" : false
 
     const ordered = effectiveWorkspaceOrder(local, dirs, store.workspaceOrder[project.worktree])

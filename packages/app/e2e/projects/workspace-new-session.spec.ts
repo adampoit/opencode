@@ -39,7 +39,7 @@ async function openWorkspaceNewSession(page: Page, slug: string) {
   const item = page.locator(workspaceItemSelector(slug)).first()
   await item.hover()
 
-  const button = page.locator(workspaceNewSessionSelector(slug)).first()
+  const button = item.locator(`[data-action="workspace-new-session"][data-workspace="${slug}"]`).first()
   await expect(button).toBeVisible()
   await button.click({ force: true })
 

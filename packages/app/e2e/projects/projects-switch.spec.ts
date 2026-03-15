@@ -96,7 +96,9 @@ test("switching back to a project opens the latest workspace session", async ({ 
         await expect(item).toBeVisible()
         await item.hover()
 
-        const btn = page.locator(`${workspaceNewSessionSelector(next)}, ${workspaceNewSessionSelector(raw)}`).first()
+        const btn = item.locator(
+          `[data-action="workspace-new-session"][data-workspace="${next}"], [data-action="workspace-new-session"][data-workspace="${raw}"]`,
+        ).first()
         await expect(btn).toBeVisible()
         await btn.click({ force: true })
 

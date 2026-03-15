@@ -703,7 +703,7 @@ export async function openWorkspaceMenu(page: Page, workspaceSlug: string) {
   await expect(item).toBeVisible()
   await item.hover()
 
-  const trigger = page.locator(workspaceMenuTriggerSelector(workspaceSlug)).first()
+  const trigger = item.locator(`[data-action="workspace-menu"][data-workspace="${workspaceSlug}"]`).first()
   await expect(trigger).toBeVisible()
   await trigger.click({ force: true })
 
