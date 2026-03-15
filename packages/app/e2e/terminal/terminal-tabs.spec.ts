@@ -52,16 +52,22 @@ test("inactive terminal tab buffers persist across tab switches", async ({ page,
     const tabs = page.locator('#terminal-panel [data-slot="tabs-trigger"]')
     const first = tabs.filter({ hasText: /Terminal 1/ }).first()
     const second = tabs.filter({ hasText: /Terminal 2/ }).first()
+    // Longer timeout for slower CI runners (Windows)
+    const pollTimeout = process.platform === "win32" ? 60_000 : 30_000
 
     await gotoSession()
     await open(page)
 
     await run(page, `echo ${one}`)
+    // Wait for output to be processed before switching tabs
+    await page.waitForTimeout(500)
 
     await page.getByRole("button", { name: /new terminal/i }).click()
     await expect(tabs).toHaveCount(2)
 
     await run(page, `echo ${two}`)
+    // Wait for output to be processed before switching tabs
+    await page.waitForTimeout(500)
 
     await first.click()
     await expect(first).toHaveAttribute("aria-selected", "true")
@@ -76,7 +82,7 @@ test("inactive terminal tab buffers persist across tab switches", async ({ page,
             second: second.includes(two),
           }
         },
-        { timeout: 30_000 },
+        { timeout: pollTimeout },
       )
       .toEqual({ first: false, second: true })
 
@@ -93,7 +99,7 @@ test("inactive terminal tab buffers persist across tab switches", async ({ page,
             second: second.includes(two),
           }
         },
-        { timeout: 30_000 },
+        { timeout: pollTimeout },
       )
       .toEqual({ first: true, second: false })
   })
