@@ -350,6 +350,19 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             })
           })
         })
+        .catch((error) => {
+          // If session not found (404), set empty messages to unblock UI
+          if (error?.name === "NotFoundError" || error?.status === 404) {
+            if (!tracked(input.directory, input.sessionID)) return
+            batch(() => {
+              input.setStore("message", input.sessionID, [])
+              setMeta("limit", key, 0)
+              setMeta("complete", key, true)
+            })
+            return
+          }
+          throw error
+        })
         .finally(() => {
           setMeta(
             produce((draft) => {
@@ -464,22 +477,30 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             const sessionReq =
               hasSession && !opts?.force
                 ? Promise.resolve()
-                : retry(() => client.session.get({ sessionID })).then((session) => {
-                    if (!tracked(directory, sessionID)) return
-                    const data = session.data
-                    if (!data) return
-                    setStore(
-                      "session",
-                      produce((draft) => {
-                        const match = Binary.search(draft, sessionID, (s) => s.id)
-                        if (match.found) {
-                          draft[match.index] = data
-                          return
-                        }
-                        draft.splice(match.index, 0, data)
-                      }),
-                    )
-                  })
+                : retry(() => client.session.get({ sessionID }))
+                    .then((session) => {
+                      if (!tracked(directory, sessionID)) return
+                      const data = session.data
+                      if (!data) return
+                      setStore(
+                        "session",
+                        produce((draft) => {
+                          const match = Binary.search(draft, sessionID, (s) => s.id)
+                          if (match.found) {
+                            draft[match.index] = data
+                            return
+                          }
+                          draft.splice(match.index, 0, data)
+                        }),
+                      )
+                    })
+                    .catch((error) => {
+                      // If session not found (404), silently fail - loadMessages will handle empty state
+                      if (error?.name === "NotFoundError" || error?.status === 404) {
+                        return
+                      }
+                      throw error
+                    })
 
             const messagesReq =
               cached && !opts?.force
