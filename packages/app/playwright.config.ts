@@ -7,13 +7,16 @@ const serverPort = process.env.PLAYWRIGHT_SERVER_PORT ?? "4096"
 const command = `bun run dev -- --host 0.0.0.0 --port ${port}`
 const reuse = !process.env.CI
 const workers = Number(process.env.PLAYWRIGHT_WORKERS ?? (process.env.CI ? 5 : 0)) || undefined
+// Longer timeouts for slower CI runners (GitHub-hosted vs Blacksmith)
+const testTimeout = process.env.CI ? 120_000 : 60_000
+const expectTimeout = process.env.CI ? 20_000 : 10_000
 
 export default defineConfig({
   testDir: "./e2e",
   outputDir: "./e2e/test-results",
-  timeout: 60_000,
+  timeout: testTimeout,
   expect: {
-    timeout: 10_000,
+    timeout: expectTimeout,
   },
   fullyParallel: process.env.PLAYWRIGHT_FULLY_PARALLEL === "1",
   forbidOnly: !!process.env.CI,

@@ -263,6 +263,9 @@ async function newWorkspaceSession(page: Page, slug: string) {
   return currentDir(page)
 }
 
+// Longer timeout for slower CI runners
+test.setTimeout(process.env.CI ? 180_000 : 120_000)
+
 test("session model and variant restore per session without leaking into new sessions", async ({
   page,
   withProject,
