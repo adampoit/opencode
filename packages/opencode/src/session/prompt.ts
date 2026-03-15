@@ -298,7 +298,16 @@ export namespace SessionPrompt {
       SessionStatus.set(sessionID, { type: "busy" })
       log.info("loop", { step, sessionID })
       if (abort.aborted) break
-      let msgs = await MessageV2.filterCompacted(MessageV2.stream(sessionID))
+      let msgs: MessageV2.WithParts[]
+      try {
+        msgs = await MessageV2.filterCompacted(MessageV2.stream(sessionID))
+      } catch (error) {
+        if (error?.constructor?.name === "NotFoundError") {
+          log.info("session not found during loop, breaking", { sessionID })
+          break
+        }
+        throw error
+      }
 
       let lastUser: MessageV2.User | undefined
       let lastAssistant: MessageV2.Assistant | undefined
@@ -722,20 +731,36 @@ export namespace SessionPrompt {
       continue
     }
     SessionCompaction.prune({ sessionID })
-    for await (const item of MessageV2.stream(sessionID)) {
-      if (item.info.role === "user") continue
-      const queued = state()[sessionID]?.callbacks ?? []
-      for (const q of queued) {
-        q.resolve(item)
+    try {
+      for await (const item of MessageV2.stream(sessionID)) {
+        if (item.info.role === "user") continue
+        const queued = state()[sessionID]?.callbacks ?? []
+        for (const q of queued) {
+          q.resolve(item)
+        }
+        return item
       }
-      return item
+    } catch (error) {
+      if (error?.constructor?.name === "NotFoundError") {
+        log.info("session not found during prompt, returning empty", { sessionID })
+        return
+      }
+      throw error
     }
     throw new Error("Impossible")
   })
 
   async function lastModel(sessionID: SessionID) {
-    for await (const item of MessageV2.stream(sessionID)) {
-      if (item.info.role === "user" && item.info.model) return item.info.model
+    try {
+      for await (const item of MessageV2.stream(sessionID)) {
+        if (item.info.role === "user" && item.info.model) return item.info.model
+      }
+    } catch (error) {
+      if (error?.constructor?.name === "NotFoundError") {
+        log.info("session not found during lastModel, returning default", { sessionID })
+        return Provider.defaultModel()
+      }
+      throw error
     }
     return Provider.defaultModel()
   }

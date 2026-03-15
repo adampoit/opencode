@@ -23,7 +23,13 @@ export namespace SessionRevert {
 
   export async function revert(input: RevertInput) {
     SessionPrompt.assertNotBusy(input.sessionID)
-    const all = await Session.messages({ sessionID: input.sessionID })
+    const all = await Session.messages({ sessionID: input.sessionID }).catch((error) => {
+      if (error?.constructor?.name === "NotFoundError") {
+        log.info("session not found during revert, skipping", { sessionID: input.sessionID })
+        return []
+      }
+      throw error
+    })
     let lastUser: MessageV2.User | undefined
     const session = await Session.get(input.sessionID)
 
@@ -91,7 +97,13 @@ export namespace SessionRevert {
   export async function cleanup(session: Session.Info) {
     if (!session.revert) return
     const sessionID = session.id
-    const msgs = await Session.messages({ sessionID })
+    const msgs = await Session.messages({ sessionID }).catch((error) => {
+      if (error?.constructor?.name === "NotFoundError") {
+        log.info("session not found during cleanup, skipping", { sessionID })
+        return []
+      }
+      throw error
+    })
     const messageID = session.revert.messageID
     const preserve = [] as MessageV2.WithParts[]
     const remove = [] as MessageV2.WithParts[]
