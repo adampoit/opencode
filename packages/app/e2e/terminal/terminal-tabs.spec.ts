@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test"
+import { runTerminal, waitTerminalReady } from "../actions"
 import { test, expect } from "../fixtures"
 import { terminalSelector } from "../selectors"
 import { terminalToggleKey, workspacePersistKey } from "../utils"
@@ -17,16 +18,7 @@ async function open(page: Page) {
   const terminal = page.locator(terminalSelector)
   const visible = await terminal.isVisible().catch(() => false)
   if (!visible) await page.keyboard.press(terminalToggleKey)
-  await expect(terminal).toBeVisible()
-  await expect(terminal.locator("textarea")).toHaveCount(1)
-}
-
-async function run(page: Page, cmd: string) {
-  const terminal = page.locator(terminalSelector)
-  await expect(terminal).toBeVisible()
-  await terminal.click()
-  await page.keyboard.type(cmd)
-  await page.keyboard.press("Enter")
+  await waitTerminalReady(page, { term: terminal })
 }
 
 async function store(page: Page, key: string) {
@@ -58,19 +50,28 @@ test("inactive terminal tab buffers persist across tab switches", async ({ page,
     await gotoSession()
     await open(page)
 
+<<<<<<< HEAD
     await run(page, `echo ${one}`)
     // Wait for output to be processed before switching tabs
     await page.waitForTimeout(500)
+=======
+    await runTerminal(page, { cmd: `echo ${one}`, token: one })
+>>>>>>> v1.2.26
 
     await page.getByRole("button", { name: /new terminal/i }).click()
     await expect(tabs).toHaveCount(2)
 
+<<<<<<< HEAD
     await run(page, `echo ${two}`)
     // Wait for output to be processed before switching tabs
     await page.waitForTimeout(500)
+=======
+    await runTerminal(page, { cmd: `echo ${two}`, token: two })
+>>>>>>> v1.2.26
 
     await first.click()
     await expect(first).toHaveAttribute("aria-selected", "true")
+
     await expect
       .poll(
         async () => {
@@ -82,7 +83,11 @@ test("inactive terminal tab buffers persist across tab switches", async ({ page,
             second: second.includes(two),
           }
         },
+<<<<<<< HEAD
         { timeout: pollTimeout },
+=======
+        { timeout: 5_000 },
+>>>>>>> v1.2.26
       )
       .toEqual({ first: false, second: true })
 
@@ -99,7 +104,11 @@ test("inactive terminal tab buffers persist across tab switches", async ({ page,
             second: second.includes(two),
           }
         },
+<<<<<<< HEAD
         { timeout: pollTimeout },
+=======
+        { timeout: 5_000 },
+>>>>>>> v1.2.26
       )
       .toEqual({ first: true, second: false })
   })
