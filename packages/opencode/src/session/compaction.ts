@@ -60,7 +60,13 @@ export namespace SessionCompaction {
     const config = await Config.get()
     if (config.compaction?.prune === false) return
     log.info("pruning")
-    const msgs = await Session.messages({ sessionID: input.sessionID })
+    const msgs = await Session.messages({ sessionID: input.sessionID }).catch((error) => {
+      if (error?.constructor?.name === "NotFoundError") {
+        log.info("session not found, skipping prune", { sessionID: input.sessionID })
+        return []
+      }
+      throw error
+    })
     let total = 0
     let pruned = 0
     const toPrune = []
