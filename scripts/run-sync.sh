@@ -221,6 +221,13 @@ if $merge_had_conflicts; then
     printf 'Unresolved merge conflicts remain:\n%s\n' "$unmerged_files" >&2
     exit 1
   fi
+
+  # Check for conflict markers in staged files
+  conflict_markers="$(git diff --cached --no-ext-diff --pickaxe-regex -S'<<<<<<< ' --name-only 2>/dev/null || true)"
+  if [[ -n "$conflict_markers" ]]; then
+    printf 'Merge conflict markers found in staged files:\n%s\n' "$conflict_markers" >&2
+    exit 1
+  fi
 fi
 
 git commit --no-edit --allow-empty
