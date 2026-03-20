@@ -212,9 +212,6 @@ else
   log "No policy script configured; skipping policy step."
 fi
 
-git add -A
-git rm --cached --quiet --force --ignore-unmatch .fork-sync-kit
-
 if $merge_had_conflicts; then
   unmerged_files="$(git diff --name-only --diff-filter=U)"
   if [[ -n "$unmerged_files" ]]; then
@@ -222,13 +219,18 @@ if $merge_had_conflicts; then
     exit 1
   fi
 
-  # Check for conflict markers in staged files
+  git add -A
+
   conflict_markers="$(git diff --cached --no-ext-diff --pickaxe-regex -S'<<<<<<< ' --name-only 2>/dev/null || true)"
   if [[ -n "$conflict_markers" ]]; then
     printf 'Merge conflict markers found in staged files:\n%s\n' "$conflict_markers" >&2
     exit 1
   fi
+else
+  git add -A
 fi
+
+git rm --cached --quiet --force --ignore-unmatch .fork-sync-kit
 
 git commit --no-edit --allow-empty
 
