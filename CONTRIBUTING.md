@@ -69,6 +69,25 @@ Then run it with:
 
 Replace `<platform>` with your platform (e.g., `darwin-arm64`, `linux-x64`).
 
+### Nix Binary Cache
+
+This repo can publish Linux Nix build outputs to GitHub Pages with `static-nix-cache` via `.github/workflows/nix-cache.yml`.
+
+Before the workflow can deploy, enable GitHub Pages in the repository settings with the source set to GitHub Actions.
+
+If you want a signed cache, generate a key pair:
+
+```bash
+nix-store --generate-binary-cache-key opencode-cache-1 private.pem public.pem
+```
+
+Then add:
+
+- `NIX_CACHE_SIGNING_KEY` as a GitHub Actions secret containing the contents of `private.pem`
+- `NIX_CACHE_PUBLIC_KEY` as a GitHub Actions variable containing the contents of `public.pem`
+
+The workflows will publish and consume `https://<owner>.github.io/<repo>/cache`, and they automatically trust `NIX_CACHE_PUBLIC_KEY` when it is configured.
+
 - Core pieces:
   - `packages/opencode`: OpenCode core business logic & server.
   - `packages/opencode/src/cli/cmd/tui/`: The TUI code, written in SolidJS with [opentui](https://github.com/sst/opentui)
