@@ -94,6 +94,7 @@ ORIGIN_REMOTE_NAME="${ORIGIN_REMOTE_NAME:-origin}"
 UPSTREAM_REMOTE_NAME="${UPSTREAM_REMOTE_NAME:-upstream}"
 UPSTREAM_REMOTE_URL="${UPSTREAM_REMOTE_URL:-https://github.com/${UPSTREAM_OWNER}/${UPSTREAM_REPO}.git}"
 GH_REPO="${GH_REPO:-${GITHUB_REPOSITORY:-}}"
+BOT_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
 
 release_tag=""
 release_url=""
@@ -103,6 +104,9 @@ pr_url=""
 status="completed"
 conflicted=false
 conflicts=""
+pr_json=""
+remote_tip=""
+skip_push=false
 
 repo_path="repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}"
 
@@ -187,6 +191,12 @@ print(template.replace('{tag}', tag).replace('{base_branch}', base_branch).repla
 PY
 )"
 
+pr_json="$(gh pr list --repo "$GH_REPO" --state open --head "$sync_branch" --base "$BASE_BRANCH" --json number,url | jq '.[0] // empty')"
+if git ls-remote --exit-code --heads "$ORIGIN_REMOTE_NAME" "$sync_branch" >/dev/null 2>&1; then
+  git fetch --no-tags "$ORIGIN_REMOTE_NAME" "+refs/heads/${sync_branch}:refs/remotes/${ORIGIN_REMOTE_NAME}/${sync_branch}"
+  remote_tip="$(git rev-parse "refs/remotes/${ORIGIN_REMOTE_NAME}/${sync_branch}")"
+fi
+
 log "Creating sync branch ${sync_branch} from ${BASE_BRANCH}"
 git checkout -B "$sync_branch" "${ORIGIN_REMOTE_NAME}/${BASE_BRANCH}"
 merge_had_conflicts=false
@@ -263,6 +273,28 @@ fi
 
 write_output sync_branch "$sync_branch"
 
+if [[ -n "$remote_tip" ]]; then
+  remote_email="$(git log -1 --format='%ce' "$remote_tip")"
+  if [[ "$remote_email" != "$BOT_EMAIL" ]]; then
+    if [[ -n "$pr_json" ]]; then
+      pr_number="$(jq -r '.number' <<<"$pr_json")"
+      pr_url="$(jq -r '.url' <<<"$pr_json")"
+    fi
+
+    status="manual_changes"
+    write_output pr_number "$pr_number"
+    write_output pr_url "$pr_url"
+    write_output status "$status"
+    log "Remote sync branch ${sync_branch} has non-bot commits; skipping update to preserve manual changes."
+    exit 0
+  fi
+
+  if [[ "$(git rev-parse HEAD^{tree})" == "$(git rev-parse "${remote_tip}^{tree}")" ]]; then
+    skip_push=true
+    log "Remote sync branch ${sync_branch} already matches generated content; skipping push."
+  fi
+fi
+
 if is_true "$DRY_RUN"; then
   status="dry_run"
   write_output pr_number ""
@@ -272,8 +304,12 @@ if is_true "$DRY_RUN"; then
   exit 0
 fi
 
-log "Pushing ${sync_branch} to ${ORIGIN_REMOTE_NAME}"
-git push --force-with-lease --set-upstream "$ORIGIN_REMOTE_NAME" "$sync_branch"
+if $skip_push; then
+  log "Using existing remote branch ${sync_branch}"
+else
+  log "Pushing ${sync_branch} to ${ORIGIN_REMOTE_NAME}"
+  git push --force-with-lease --set-upstream "$ORIGIN_REMOTE_NAME" "$sync_branch"
+fi
 
 body_file="$(mktemp)"
 trap 'rm -f "$body_file"' EXIT
@@ -306,10 +342,10 @@ if [[ -n "$PR_LABELS" ]]; then
   done
 fi
 
-existing_json="$(gh pr list --repo "$GH_REPO" --state open --head "$sync_branch" --base "$BASE_BRANCH" --json number,url | jq '.[0] // empty')"
-if [[ -n "$existing_json" ]]; then
-  pr_number="$(jq -r '.number' <<<"$existing_json")"
-  pr_url="$(jq -r '.url' <<<"$existing_json")"
+pr_json="$(gh pr list --repo "$GH_REPO" --state open --head "$sync_branch" --base "$BASE_BRANCH" --json number,url | jq '.[0] // empty')"
+if [[ -n "$pr_json" ]]; then
+  pr_number="$(jq -r '.number' <<<"$pr_json")"
+  pr_url="$(jq -r '.url' <<<"$pr_json")"
   gh pr edit "$pr_number" --repo "$GH_REPO" --title "$pr_title" --body-file "$body_file" >/dev/null
   if [[ ${#label_edit_args[@]} -gt 0 ]]; then
     gh pr edit "$pr_number" --repo "$GH_REPO" "${label_edit_args[@]}" >/dev/null
