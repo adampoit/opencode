@@ -45,7 +45,7 @@ jobs:
         uses: randymarsh77/static-nix-cache/setup@7e5e0f2e1ce2e252c5bd173122d069a139edbd51
 
       - name: Build Linux Nix outputs
-        run: nix build .#opencode .#devShells.x86_64-linux.default
+        run: nix build .#opencode
 
       - name: Upload NARs and generate cache site
         uses: randymarsh77/static-nix-cache/deploy@7e5e0f2e1ce2e252c5bd173122d069a139edbd51
