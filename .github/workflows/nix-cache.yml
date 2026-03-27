@@ -31,7 +31,7 @@ jobs:
 
       - name: Configure repository cache
         env:
-          CACHE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/cache
+          CACHE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
           CACHE_KEY: ${{ vars.NIX_CACHE_PUBLIC_KEY }}
         run: |
           set -euo pipefail
@@ -42,13 +42,13 @@ jobs:
           fi
 
       - name: Snapshot Nix store
-        uses: ./.github/actions/static-nix-cache/setup
+        uses: adampoit/static-nix-cache/setup@2e776e89d2cf91055e2b78560c67255722f41739
 
       - name: Build Linux Nix outputs
         run: nix build .#opencode
 
       - name: Upload NARs and generate cache site
-        uses: ./.github/actions/static-nix-cache/deploy
+        uses: adampoit/static-nix-cache/deploy@2e776e89d2cf91055e2b78560c67255722f41739
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
