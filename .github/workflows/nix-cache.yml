@@ -15,13 +15,18 @@ permissions:
   id-token: write
 
 jobs:
-  publish:
-    name: publish nix cache
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    environment:
-      name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
+  build:
+    name: build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            os: ubuntu-latest
+          - name: darwin
+            os: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -44,9 +49,23 @@ jobs:
       - name: Snapshot Nix store
         uses: adampoit/static-nix-cache/setup@7e2610408dcb426a2708f057e585d108cf32e221
 
-      - name: Build Linux Nix outputs
+      - name: Build Nix output
         run: nix build .#opencode
 
+      - name: Save store paths
+        uses: adampoit/static-nix-cache/save@7e2610408dcb426a2708f057e585d108cf32e221
+        with:
+          name: ${{ matrix.name }}
+
+  publish:
+    name: publish nix cache
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
       - name: Upload NARs and generate cache site
         uses: adampoit/static-nix-cache/deploy@7e2610408dcb426a2708f057e585d108cf32e221
         with:
