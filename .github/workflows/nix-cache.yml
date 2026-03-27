@@ -42,13 +42,13 @@ jobs:
           fi
 
       - name: Snapshot Nix store
-        uses: randymarsh77/static-nix-cache/setup@7e5e0f2e1ce2e252c5bd173122d069a139edbd51
+        uses: ./.github/actions/static-nix-cache/setup
 
       - name: Build Linux Nix outputs
         run: nix build .#opencode
 
       - name: Upload NARs and generate cache site
-        uses: randymarsh77/static-nix-cache/deploy@7e5e0f2e1ce2e252c5bd173122d069a139edbd51
+        uses: ./.github/actions/static-nix-cache/deploy
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
