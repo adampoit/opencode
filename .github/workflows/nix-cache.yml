@@ -66,6 +66,9 @@ jobs:
       name: github-pages
       url: ${{ steps.pages.outputs.page_url }}
     steps:
+      - name: Setup Nix
+        uses: nixbuild/nix-quick-install-action@v34
+
       - name: Upload NARs and generate cache site
         uses: adampoit/static-nix-cache/deploy@7e2610408dcb426a2708f057e585d108cf32e221
         with:
