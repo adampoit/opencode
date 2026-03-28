@@ -86,7 +86,12 @@ Then add:
 - `NIX_CACHE_SIGNING_KEY` as a GitHub Actions secret containing the contents of `private.pem`
 - `NIX_CACHE_PUBLIC_KEY` as a GitHub Actions variable containing the contents of `public.pem`
 
-The workflows publish and consume `https://<owner>.github.io/<repo>`, and they automatically trust `NIX_CACHE_PUBLIC_KEY` when it is configured.
+The workflows publish and consume platform-specific cache roots:
+
+- Linux: `https://<owner>.github.io/<repo>/linux`
+- Darwin: `https://<owner>.github.io/<repo>/darwin`
+
+They automatically trust `NIX_CACHE_PUBLIC_KEY` when it is configured.
 
 - Core pieces:
   - `packages/opencode`: OpenCode core business logic & server.
