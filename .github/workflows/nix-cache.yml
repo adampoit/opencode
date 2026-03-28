@@ -51,13 +51,13 @@ jobs:
           fi
 
       - name: Snapshot Nix store
-        uses: adampoit/static-nix-cache/setup@7e2610408dcb426a2708f057e585d108cf32e221
+        uses: adampoit/static-nix-cache/setup@4855d4e3725d004fd445c68f80c10e0efd5daa4a
 
       - name: Build Nix output
         run: nix build .#opencode
 
       - name: Save store paths
-        uses: adampoit/static-nix-cache/save@7e2610408dcb426a2708f057e585d108cf32e221
+        uses: adampoit/static-nix-cache/save@4855d4e3725d004fd445c68f80c10e0efd5daa4a
         with:
           name: ${{ matrix.name }}
 
@@ -74,7 +74,7 @@ jobs:
         uses: nixbuild/nix-quick-install-action@v34
 
       - name: Upload Linux NARs and generate cache site
-        uses: adampoit/static-nix-cache/deploy@7e2610408dcb426a2708f057e585d108cf32e221
+        uses: adampoit/static-nix-cache/deploy@4855d4e3725d004fd445c68f80c10e0efd5daa4a
         with:
           artifact-pattern: static-nix-cache-linux
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -83,7 +83,7 @@ jobs:
           static: ./site/linux
 
       - name: Upload Darwin NARs and generate cache site
-        uses: adampoit/static-nix-cache/deploy@7e2610408dcb426a2708f057e585d108cf32e221
+        uses: adampoit/static-nix-cache/deploy@4855d4e3725d004fd445c68f80c10e0efd5daa4a
         with:
           artifact-pattern: static-nix-cache-darwin
           github-token: ${{ secrets.GITHUB_TOKEN }}
