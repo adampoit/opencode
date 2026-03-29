@@ -53,13 +53,11 @@ jobs:
       - name: Build Nix output
         run: nix build .#opencode --print-out-paths | tee /tmp/static-nix-cache-paths.txt
 
-      - name: Publish Nix binary
-        uses: adampoit/static-nix-cache/deploy@a1ba38bf3b15de548a8177b19532866179d4e238
+      - name: Save Nix binary
+        uses: adampoit/static-nix-cache/save@986776d29acbd428597c314fa0a02abebd403cea
         with:
           paths-file: /tmp/static-nix-cache-paths.txt
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-release-tag: ${{ matrix.release_tag }}
-          signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
+          name: ${{ matrix.name }}
 
   publish:
     name: publish nix cache
@@ -73,23 +71,22 @@ jobs:
       - name: Setup Nix
         uses: nixbuild/nix-quick-install-action@v34
 
-      - name: Prepare cache manifest input
-        run: touch /tmp/static-nix-cache-paths.txt
-
       - name: Generate Linux cache site
-        uses: adampoit/static-nix-cache/deploy@a1ba38bf3b15de548a8177b19532866179d4e238
+        uses: adampoit/static-nix-cache/deploy@986776d29acbd428597c314fa0a02abebd403cea
         with:
-          paths-file: /tmp/static-nix-cache-paths.txt
+          artifact-pattern: static-nix-cache-linux
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-release-tag: nix-cache-linux
+          signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
           static: ./site/linux
 
       - name: Generate Darwin cache site
-        uses: adampoit/static-nix-cache/deploy@a1ba38bf3b15de548a8177b19532866179d4e238
+        uses: adampoit/static-nix-cache/deploy@986776d29acbd428597c314fa0a02abebd403cea
         with:
-          paths-file: /tmp/static-nix-cache-paths.txt
+          artifact-pattern: static-nix-cache-darwin
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-release-tag: nix-cache-darwin
+          signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
           static: ./site/darwin
 
       - name: Upload GitHub Pages artifact
