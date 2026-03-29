@@ -71,7 +71,7 @@ Replace `<platform>` with your platform (e.g., `darwin-arm64`, `linux-x64`).
 
 ### Nix Binary Cache
 
-This repo can publish Linux and Darwin Nix build outputs to GitHub Pages with `static-nix-cache` via `.github/workflows/nix-cache.yml`.
+This repo can publish Linux and Darwin OpenCode Nix binaries to GitHub Pages with `static-nix-cache` via `.github/workflows/nix-cache.yml`.
 
 Before the workflow can deploy, enable GitHub Pages in the repository settings with the source set to GitHub Actions.
 

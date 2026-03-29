@@ -50,16 +50,16 @@ jobs:
             printf '%s\n' "extra-trusted-public-keys = $CACHE_KEY" >> ~/.config/nix/nix.conf
           fi
 
-      - name: Snapshot Nix store
-        uses: adampoit/static-nix-cache/setup@08edd37d46b0148ffc1c7cd6757d6b69eea7fdc0
-
       - name: Build Nix output
-        run: nix build .#opencode
+        run: nix build .#opencode --print-out-paths | tee /tmp/static-nix-cache-paths.txt
 
-      - name: Save store paths
-        uses: adampoit/static-nix-cache/save@08edd37d46b0148ffc1c7cd6757d6b69eea7fdc0
+      - name: Publish Nix binary
+        uses: adampoit/static-nix-cache/deploy@08edd37d46b0148ffc1c7cd6757d6b69eea7fdc0
         with:
-          name: ${{ matrix.name }}
+          paths-file: /tmp/static-nix-cache-paths.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-release-tag: ${{ matrix.release_tag }}
+          signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
 
   publish:
     name: publish nix cache
@@ -73,22 +73,23 @@ jobs:
       - name: Setup Nix
         uses: nixbuild/nix-quick-install-action@v34
 
-      - name: Upload Linux NARs and generate cache site
+      - name: Prepare cache manifest input
+        run: : > /tmp/static-nix-cache-paths.txt
+
+      - name: Generate Linux cache site
         uses: adampoit/static-nix-cache/deploy@08edd37d46b0148ffc1c7cd6757d6b69eea7fdc0
         with:
-          artifact-pattern: static-nix-cache-linux
+          paths-file: /tmp/static-nix-cache-paths.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-release-tag: nix-cache-linux
-          signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
           static: ./site/linux
 
-      - name: Upload Darwin NARs and generate cache site
+      - name: Generate Darwin cache site
         uses: adampoit/static-nix-cache/deploy@08edd37d46b0148ffc1c7cd6757d6b69eea7fdc0
         with:
-          artifact-pattern: static-nix-cache-darwin
+          paths-file: /tmp/static-nix-cache-paths.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-release-tag: nix-cache-darwin
-          signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
           static: ./site/darwin
 
       - name: Upload GitHub Pages artifact
