@@ -54,7 +54,7 @@ jobs:
         run: nix build .#opencode --print-out-paths | tee /tmp/static-nix-cache-paths.txt
 
       - name: Publish Nix binary
-        uses: adampoit/static-nix-cache/deploy@08edd37d46b0148ffc1c7cd6757d6b69eea7fdc0
+        uses: adampoit/static-nix-cache/deploy@a1ba38bf3b15de548a8177b19532866179d4e238
         with:
           paths-file: /tmp/static-nix-cache-paths.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -77,7 +77,7 @@ jobs:
         run: touch /tmp/static-nix-cache-paths.txt
 
       - name: Generate Linux cache site
-        uses: adampoit/static-nix-cache/deploy@08edd37d46b0148ffc1c7cd6757d6b69eea7fdc0
+        uses: adampoit/static-nix-cache/deploy@a1ba38bf3b15de548a8177b19532866179d4e238
         with:
           paths-file: /tmp/static-nix-cache-paths.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -85,7 +85,7 @@ jobs:
           static: ./site/linux
 
       - name: Generate Darwin cache site
-        uses: adampoit/static-nix-cache/deploy@08edd37d46b0148ffc1c7cd6757d6b69eea7fdc0
+        uses: adampoit/static-nix-cache/deploy@a1ba38bf3b15de548a8177b19532866179d4e238
         with:
           paths-file: /tmp/static-nix-cache-paths.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
