@@ -22,12 +22,12 @@ on:
         default: latest
         type: string
       sync_branch_prefix:
-        description: Prefix used when creating a sync branch for a release.
+        description: Branch name for `latest`, or prefix used when creating tag-specific sync branches.
         required: false
         default: sync/upstream-release
         type: string
       sync_branch:
-        description: Exact sync branch name. When omitted, the workflow derives one from the prefix and tag.
+        description: Exact sync branch name. When omitted, `latest` uses the prefix as-is and other selectors derive a tag-specific branch.
         required: false
         default: ""
         type: string
@@ -58,7 +58,7 @@ on:
         type: boolean
     secrets:
       token:
-        description: 'Token with `contents: write` and `pull-requests: write` permissions.'
+        description: "Token with `contents: write` and `pull-requests: write` permissions."
         required: false
     outputs:
       release_tag:

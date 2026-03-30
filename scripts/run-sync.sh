@@ -177,6 +177,8 @@ fi
 
 if [[ -n "$SYNC_BRANCH_INPUT" ]]; then
   sync_branch="$SYNC_BRANCH_INPUT"
+elif [[ "$RELEASE_SELECTOR" == "latest" ]]; then
+  sync_branch="$SYNC_BRANCH_PREFIX"
 else
   sync_branch="${SYNC_BRANCH_PREFIX}-${safe_tag}"
 fi
@@ -234,7 +236,12 @@ if $merge_had_conflicts; then
     git reset --hard --quiet "$release_tag"
 
     if [[ -n "$POLICY_SCRIPT" ]]; then
-      git restore --source "${ORIGIN_REMOTE_NAME}/${BASE_BRANCH}" --staged --worktree -- "$POLICY_SCRIPT"
+      dir="$(dirname "$POLICY_SCRIPT")"
+      if [[ "$dir" == "." ]]; then
+        git restore --source "${ORIGIN_REMOTE_NAME}/${BASE_BRANCH}" --staged --worktree -- "$POLICY_SCRIPT"
+      else
+        git restore --source "${ORIGIN_REMOTE_NAME}/${BASE_BRANCH}" --staged --worktree -- "$dir"
+      fi
       log "Reapplying fork policy via ${POLICY_SCRIPT}"
       env \
         BASE_BRANCH="$BASE_BRANCH" \
@@ -364,6 +371,30 @@ else
   pr_url="$(gh pr view "$pr_number" --repo "$GH_REPO" --json url --jq '.url')"
   status="created"
   log "Created PR #${pr_number}"
+fi
+
+if [[ "$RELEASE_SELECTOR" == "latest" ]]; then
+  while IFS= read -r old; do
+    [[ -n "$old" ]] || continue
+    old_number="$(jq -r '.number' <<<"$old")"
+    old_head="$(jq -r '.headRefName' <<<"$old")"
+    log "Closing superseded PR #${old_number} from ${old_head}"
+    if ! gh pr close "$old_number" --repo "$GH_REPO" --comment "Superseded by #${pr_number} for ${release_tag}." >/dev/null; then
+      log "Failed to close superseded PR #${old_number}"
+      continue
+    fi
+
+    if git ls-remote --exit-code --heads "$ORIGIN_REMOTE_NAME" "$old_head" >/dev/null 2>&1; then
+      if ! git push "$ORIGIN_REMOTE_NAME" --delete "$old_head" >/dev/null; then
+        log "Failed to delete superseded branch ${old_head}"
+      fi
+    fi
+  done < <(
+    gh pr list --repo "$GH_REPO" --state open --base "$BASE_BRANCH" --json number,headRefName |
+      jq -cr --arg cur "$pr_number" --arg head "$sync_branch" --arg prefix "$SYNC_BRANCH_PREFIX" '
+        map(select((.headRefName == $prefix or (.headRefName | startswith($prefix + "-"))) and (.headRefName != $head) and ((.number | tostring) != $cur)))[]
+      '
+  )
 fi
 
 merge_flag="$(merge_flag_for_method "$MERGE_METHOD")"

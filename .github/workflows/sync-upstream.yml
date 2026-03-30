@@ -29,6 +29,7 @@ jobs:
       base_branch: dev
       release_selector: ${{ github.event_name == 'workflow_dispatch' && inputs.release_selector || 'latest' }}
       sync_branch_prefix: sync/upstream-release
+      sync_branch: ${{ (github.event_name == 'workflow_dispatch' && inputs.release_selector || 'latest') == 'latest' && 'sync/upstream-release' || '' }}
       pr_labels: upstream-sync
       pr_title: Sync upstream release {tag}
       policy_script: ci/fork-policy.sh
