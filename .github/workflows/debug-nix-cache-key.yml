@@ -1,0 +1,25 @@
+name: debug-nix-cache-key
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Nix
+        uses: nixbuild/nix-quick-install-action@v34
+
+      - name: Compare signing key to public key
+        env:
+          EXPECTED: ${{ vars.NIX_CACHE_PUBLIC_KEY }}
+          SECRET: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          actual=$(printf '%s\n' "$SECRET" | nix key convert-secret-to-public)
+          printf 'expected=%s\n' "$EXPECTED"
+          printf 'actual=%s\n' "$actual"
+          test "$actual" = "$EXPECTED"
