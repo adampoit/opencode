@@ -1,0 +1,113 @@
+name: ci
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Run typecheck
+        run: bun typecheck
+
+  unit_linux:
+    name: unit (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Configure git identity
+        run: |
+          git config --global user.email "bot@opencode.ai"
+          git config --global user.name "opencode"
+
+      - name: Run unit tests
+        run: bun turbo test
+
+  e2e_linux:
+    name: e2e (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: true
+      PLAYWRIGHT_BROWSERS_PATH: 0
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Install Playwright browsers
+        working-directory: packages/app
+        run: bunx playwright install --with-deps
+
+      - name: Run app e2e tests
+        run: bun --cwd packages/app test:e2e:local
+
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-linux-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            packages/app/e2e/test-results
+            packages/app/e2e/playwright-report
+
+  nix_eval:
+    name: nix-eval
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Nix
+        uses: nixbuild/nix-quick-install-action@v34
+
+      - name: Configure repository cache
+        env:
+          CACHE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/linux
+          CACHE_KEY: ${{ vars.NIX_CACHE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.config/nix
+          printf '%s\n' "extra-substituters = $CACHE_URL" >> ~/.config/nix/nix.conf
+          if [ -n "$CACHE_KEY" ]; then
+            printf '%s\n' "extra-trusted-public-keys = $CACHE_KEY" >> ~/.config/nix/nix.conf
+          fi
+
+      - name: Evaluate flake outputs
+        run: |
+          set -euo pipefail
+          nix --version
+          nix flake metadata
+          nix flake show --all-systems
+          nix eval ".#packages.x86_64-linux.opencode.drvPath" --raw
+          nix eval ".#devShells.x86_64-linux.default.drvPath" --raw
