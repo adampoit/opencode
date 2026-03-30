@@ -294,7 +294,7 @@ export namespace SessionPrompt {
     let structuredOutput: unknown | undefined
 
     let step = 0
-    const session = await Session.get(sessionID)
+    const initial = await Session.get(sessionID)
     while (true) {
       await SessionStatus.set(sessionID, { type: "busy" })
       log.info("loop", { step, sessionID })
@@ -337,7 +337,7 @@ export namespace SessionPrompt {
       step++
       if (step === 1)
         ensureTitle({
-          session,
+          session: initial,
           modelID: lastUser.model.modelID,
           providerID: lastUser.model.providerID,
           history: msgs,
@@ -574,6 +574,8 @@ export namespace SessionPrompt {
         continue
       }
 
+      const session = await Session.get(sessionID)
+
       // normal processing
       const agent = await Agent.get(lastUser.agent)
       if (!agent) {
@@ -678,10 +680,9 @@ export namespace SessionPrompt {
 
       await Plugin.trigger("experimental.chat.messages.transform", {}, { messages: msgs })
 
-      // Build system prompt, adding structured output instruction if needed
       const skills = await SystemPrompt.skills(agent)
       const system = [
-        ...(await SystemPrompt.environment(model)),
+        ...(await SystemPrompt.environment(model, session.permission ?? [])),
         ...(skills ? [skills] : []),
         ...(await InstructionPrompt.system()),
       ]
