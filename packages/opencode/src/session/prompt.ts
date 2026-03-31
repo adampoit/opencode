@@ -1332,7 +1332,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         function* (sessionID: SessionID) {
           let structured: unknown | undefined
           let step = 0
-          const session = yield* sessions.get(sessionID)
+          const initial = yield* sessions.get(sessionID)
 
           while (true) {
             yield* status.set(sessionID, { type: "busy" })
@@ -1367,7 +1367,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             step++
             if (step === 1)
               yield* title({
-                session,
+                session: initial,
                 modelID: lastUser.model.modelID,
                 providerID: lastUser.model.providerID,
                 history: msgs,
@@ -1377,7 +1377,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             const task = tasks.pop()
 
             if (task?.type === "subtask") {
-              yield* handleSubtask({ task, model, lastUser, sessionID, session, msgs })
+              yield* handleSubtask({ task, model, lastUser, sessionID, session: initial, msgs })
               continue
             }
 
@@ -1401,6 +1401,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               yield* compaction.create({ sessionID, agent: lastUser.agent, model: lastUser.model, auto: true })
               continue
             }
+
+            const session = yield* sessions.get(sessionID)
 
             const agent = yield* agents.get(lastUser.agent)
             if (!agent) {
@@ -1485,7 +1487,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 const [skills, env, instructions, modelMsgs] = yield* Effect.promise(() =>
                   Promise.all([
                     SystemPrompt.skills(agent),
-                    SystemPrompt.environment(model),
+                    SystemPrompt.environment(model, session.permission ?? []),
                     InstructionPrompt.system(),
                     MessageV2.toModelMessages(msgs, model),
                   ]),

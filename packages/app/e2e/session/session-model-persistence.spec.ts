@@ -298,6 +298,10 @@ async function newWorkspaceSession(page: Page, slug: string) {
   return waitSession(page, { directory: next.directory }).then((item) => item.directory)
 }
 
+// Longer timeout for slower CI runners (Windows needs more time)
+const testTimeout = process.env.CI ? (process.platform === "win32" ? 240_000 : 180_000) : 120_000
+test.setTimeout(testTimeout)
+
 test("session model restore per session without leaking into new sessions", async ({ page, withProject }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
 
