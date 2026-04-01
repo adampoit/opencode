@@ -146,7 +146,6 @@ jobs:
           nix eval ".#devShells.${sys}.default.drvPath" --raw
 
       - name: Build Nix package
-        if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
           sys=$(nix eval --impure --expr builtins.currentSystem --raw)
