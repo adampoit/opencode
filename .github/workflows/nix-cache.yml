@@ -51,7 +51,9 @@ jobs:
           fi
 
       - name: Build Nix output
-        run: nix build .#opencode --print-out-paths | tee /tmp/static-nix-cache-paths.txt
+        run: |
+          set -euo pipefail
+          nix build .#opencode --print-out-paths | tee /tmp/static-nix-cache-paths.txt
 
       - name: Save Nix binary
         uses: adampoit/static-nix-cache/save@986776d29acbd428597c314fa0a02abebd403cea

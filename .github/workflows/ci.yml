@@ -29,10 +29,18 @@ jobs:
       - name: Run typecheck
         run: bun typecheck
 
-  unit_linux:
-    name: unit (linux)
-    runs-on: ubuntu-latest
+  unit:
+    name: unit (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            os: ubuntu-latest
+          - name: darwin
+            os: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -48,10 +56,18 @@ jobs:
       - name: Run unit tests
         run: bun turbo test
 
-  e2e_linux:
-    name: e2e (linux)
-    runs-on: ubuntu-latest
+  e2e:
+    name: e2e (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            os: ubuntu-latest
+          - name: darwin
+            os: macos-latest
     env:
       CI: true
       PLAYWRIGHT_BROWSERS_PATH: 0
@@ -63,8 +79,14 @@ jobs:
         uses: ./.github/actions/setup-bun
 
       - name: Install Playwright browsers
+        if: matrix.name == 'linux'
         working-directory: packages/app
         run: bunx playwright install --with-deps
+
+      - name: Install Playwright browsers
+        if: matrix.name == 'darwin'
+        working-directory: packages/app
+        run: bunx playwright install
 
       - name: Run app e2e tests
         run: bun --cwd packages/app test:e2e:local
@@ -73,7 +95,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-linux-${{ github.run_attempt }}
+          name: playwright-${{ matrix.name }}-${{ github.run_attempt }}
           if-no-files-found: ignore
           retention-days: 7
           path: |
@@ -81,9 +103,19 @@ jobs:
             packages/app/e2e/playwright-report
 
   nix_eval:
-    name: nix-eval
-    runs-on: ubuntu-latest
+    name: nix-eval (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            os: ubuntu-latest
+            cache_path: linux
+          - name: darwin
+            os: macos-latest
+            cache_path: darwin
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -93,7 +125,7 @@ jobs:
 
       - name: Configure repository cache
         env:
-          CACHE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/linux
+          CACHE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ matrix.cache_path }}
           CACHE_KEY: ${{ vars.NIX_CACHE_PUBLIC_KEY }}
         run: |
           set -euo pipefail
@@ -106,8 +138,16 @@ jobs:
       - name: Evaluate flake outputs
         run: |
           set -euo pipefail
+          sys=$(nix eval --impure --expr builtins.currentSystem --raw)
           nix --version
           nix flake metadata
           nix flake show --all-systems
-          nix eval ".#packages.x86_64-linux.opencode.drvPath" --raw
-          nix eval ".#devShells.x86_64-linux.default.drvPath" --raw
+          nix eval ".#packages.${sys}.opencode.drvPath" --raw
+          nix eval ".#devShells.${sys}.default.drvPath" --raw
+
+      - name: Build Nix package
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          sys=$(nix eval --impure --expr builtins.currentSystem --raw)
+          nix build ".#packages.${sys}.opencode"
