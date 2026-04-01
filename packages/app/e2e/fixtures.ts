@@ -154,7 +154,7 @@ async function seedStorage(page: Page, input: { directory: string; extra?: strin
       "opencode.global.dat:model",
       JSON.stringify({
         recent: [model],
-        user: [],
+        user: [{ ...model, visibility: "show" }],
         variant: {},
       }),
     )
