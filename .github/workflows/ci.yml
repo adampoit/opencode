@@ -105,7 +105,6 @@ jobs:
   nix_build:
     name: nix-build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
     permissions:
       contents: write
     strategy:
