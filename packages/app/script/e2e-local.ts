@@ -87,7 +87,7 @@ const runnerEnv = {
 
 let seed: ReturnType<typeof Bun.spawn> | undefined
 let runner: ReturnType<typeof Bun.spawn> | undefined
-let server: { stop: () => Promise<void> | void } | undefined
+let server: { stop: (closeActiveConnections?: boolean) => Promise<void> | void } | undefined
 let inst: { Instance: { disposeAll: () => Promise<void> | void } } | undefined
 let cleaned = false
 
@@ -100,7 +100,7 @@ const cleanup = async () => {
 
   const jobs = [
     inst?.Instance.disposeAll(),
-    server?.stop(),
+    server?.stop(true),
     keepSandbox ? undefined : fs.rm(sandbox, { recursive: true, force: true }),
   ].filter(Boolean)
   await Promise.allSettled(jobs)
