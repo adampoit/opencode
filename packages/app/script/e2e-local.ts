@@ -45,6 +45,7 @@ async function waitForHealth(url: string) {
 const appDir = process.cwd()
 const repoDir = path.resolve(appDir, "../..")
 const opencodeDir = path.join(repoDir, "packages", "opencode")
+const vite = path.join(appDir, "node_modules", ".bin", process.platform === "win32" ? "vite.cmd" : "vite")
 
 const extraArgs = (() => {
   const args = process.argv.slice(2)
@@ -99,7 +100,7 @@ async function wait<T>(task: Promise<T> | T, ms: number, label: string) {
       Promise.resolve(task),
       new Promise<undefined>((resolve) => {
         timer = setTimeout(() => {
-          console.warn(`e2e-local cleanup timeout: ${label}`)
+          console.warn(`e2e-local note: cleanup step '${label}' exceeded ${ms}ms; continuing`)
           resolve(undefined)
         }, ms)
       }),
@@ -189,7 +190,7 @@ try {
     console.log(`opencode server listening on http://127.0.0.1:${serverPort}`)
 
     await waitForHealth(`http://127.0.0.1:${serverPort}/global/health`)
-    web = Bun.spawn(["bun", "run", "dev", "--", "--host", "0.0.0.0", "--port", String(webPort)], {
+    web = Bun.spawn([vite, "--host", "0.0.0.0", "--port", String(webPort)], {
       cwd: appDir,
       env: runnerEnv,
       stdout: "inherit",
