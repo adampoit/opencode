@@ -92,18 +92,43 @@ let server: { stop: (closeActiveConnections?: boolean) => Promise<void> | void }
 let inst: { Instance: { disposeAll: () => Promise<void> | void } } | undefined
 let cleaned = false
 
+async function wait<T>(task: Promise<T> | T, ms: number, label: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      Promise.resolve(task),
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => {
+          console.warn(`e2e-local cleanup timeout: ${label}`)
+          resolve(undefined)
+        }, ms)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+async function stop(proc: ReturnType<typeof Bun.spawn> | undefined, label: string) {
+  if (!proc || proc.exitCode !== null) return
+  proc.kill("SIGTERM")
+  await wait(proc.exited, 5_000, `${label} exit`)
+  if (proc.exitCode !== null) return
+  proc.kill("SIGKILL")
+  await wait(proc.exited, 1_000, `${label} kill`)
+}
+
 const cleanup = async () => {
   if (cleaned) return
   cleaned = true
 
-  if (seed && seed.exitCode === null) seed.kill("SIGTERM")
-  if (runner && runner.exitCode === null) runner.kill("SIGTERM")
-  if (web && web.exitCode === null) web.kill("SIGTERM")
-
   const jobs = [
-    inst?.Instance.disposeAll(),
-    server?.stop(true),
-    keepSandbox ? undefined : fs.rm(sandbox, { recursive: true, force: true }),
+    stop(seed, "seed"),
+    stop(runner, "runner"),
+    stop(web, "web"),
+    inst ? wait(inst.Instance.disposeAll(), 5_000, "instances") : undefined,
+    server ? wait(server.stop(true), 5_000, "server") : undefined,
+    keepSandbox ? undefined : wait(fs.rm(sandbox, { recursive: true, force: true }), 5_000, "sandbox"),
   ].filter(Boolean)
   await Promise.allSettled(jobs)
 }
