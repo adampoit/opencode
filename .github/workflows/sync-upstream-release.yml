@@ -1,0 +1,145 @@
+name: Sync Upstream Release
+
+on:
+  workflow_call:
+    inputs:
+      upstream_owner:
+        description: GitHub owner or organization for the upstream repository.
+        required: true
+        type: string
+      upstream_repo:
+        description: Repository name for the upstream repository.
+        required: true
+        type: string
+      base_branch:
+        description: Fork branch that receives upstream releases.
+        required: false
+        default: main
+        type: string
+      release_selector:
+        description: Use `latest`, `prerelease`, or a regex matched against upstream tag names.
+        required: false
+        default: latest
+        type: string
+      sync_branch_prefix:
+        description: Branch name for `latest`, or prefix used when creating tag-specific sync branches.
+        required: false
+        default: sync/upstream-release
+        type: string
+      sync_branch:
+        description: Exact sync branch name. When omitted, `latest` uses the prefix as-is and other selectors derive a tag-specific branch.
+        required: false
+        default: ""
+        type: string
+      pr_labels:
+        description: Comma-separated labels added when the PR is created.
+        required: false
+        default: upstream-sync
+        type: string
+      pr_title:
+        description: PR title template. Supports `{tag}`, `{base_branch}`, and `{upstream}` tokens.
+        required: false
+        default: Sync upstream release {tag}
+        type: string
+      policy_script:
+        description: Path to the fork-local policy script. Leave blank to skip the policy step.
+        required: false
+        default: ci/fork-policy.sh
+        type: string
+      merge_method:
+        description: Auto-merge method to request for the PR.
+        required: false
+        default: merge
+        type: string
+      dry_run:
+        description: Skip pushing, PR creation, and auto-merge while still exercising merge and policy steps locally.
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      token:
+        description: "Token with `contents: write` and `pull-requests: write` permissions."
+        required: false
+    outputs:
+      release_tag:
+        description: Upstream release tag selected for the run.
+        value: ${{ jobs.sync.outputs.release_tag }}
+      release_url:
+        description: URL for the upstream release page.
+        value: ${{ jobs.sync.outputs.release_url }}
+      sync_branch:
+        description: Sync branch used for the PR when an update is needed.
+        value: ${{ jobs.sync.outputs.sync_branch }}
+      pr_number:
+        description: Pull request number when a PR is created or updated.
+        value: ${{ jobs.sync.outputs.pr_number }}
+      pr_url:
+        description: Pull request URL when a PR is created or updated.
+        value: ${{ jobs.sync.outputs.pr_url }}
+      status:
+        description: Final workflow status.
+        value: ${{ jobs.sync.outputs.status }}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Sync upstream release into fork
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.sync.outputs.release_tag }}
+      release_url: ${{ steps.sync.outputs.release_url }}
+      sync_branch: ${{ steps.sync.outputs.sync_branch }}
+      pr_number: ${{ steps.sync.outputs.pr_number }}
+      pr_url: ${{ steps.sync.outputs.pr_url }}
+      status: ${{ steps.sync.outputs.status }}
+    env:
+      GH_TOKEN: ${{ secrets.token || github.token }}
+      BASE_BRANCH: ${{ inputs.base_branch }}
+      POLICY_SCRIPT: ${{ inputs.policy_script }}
+      RELEASE_SELECTOR: ${{ inputs.release_selector }}
+      SYNC_BRANCH_INPUT: ${{ inputs.sync_branch }}
+      SYNC_BRANCH_PREFIX: ${{ inputs.sync_branch_prefix }}
+      PR_LABELS: ${{ inputs.pr_labels }}
+      PR_TITLE_TEMPLATE: ${{ inputs.pr_title }}
+      UPSTREAM_OWNER: ${{ inputs.upstream_owner }}
+      UPSTREAM_REPO: ${{ inputs.upstream_repo }}
+      MERGE_METHOD: ${{ inputs.merge_method }}
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - name: Resolve kit source
+        id: source
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+          repository="${WORKFLOW_REF%%/.github/workflows/*}"
+          ref="${WORKFLOW_REF##*@}"
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.token || github.token }}
+
+      - name: Checkout fork-sync-kit implementation
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.source.outputs.repository }}
+          ref: ${{ steps.source.outputs.ref }}
+          path: .fork-sync-kit
+          sparse-checkout: |
+            scripts
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run sync logic
+        id: sync
+        run: ./.fork-sync-kit/scripts/run-sync.sh
