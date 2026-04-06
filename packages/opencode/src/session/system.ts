@@ -1,4 +1,4 @@
-import { Ripgrep } from "../file/ripgrep"
+import path from "path"
 
 import { Instance } from "../project/instance"
 
@@ -17,6 +17,25 @@ import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 
 export namespace SystemPrompt {
+  function external(permission: Permission.Ruleset) {
+    return Array.from(
+      new Set(
+        permission
+          .filter((rule) => rule.permission === "external_directory" && rule.action === "allow")
+          .map((rule) => {
+            if (rule.pattern.endsWith("/*")) return path.normalize(rule.pattern.slice(0, -2))
+            if (rule.pattern.endsWith("\\*")) return path.normalize(rule.pattern.slice(0, -2))
+          })
+          .filter((rule): rule is string => Boolean(rule))
+          .filter((rule) => path.isAbsolute(rule)),
+      ),
+    )
+  }
+
+  export function instructions() {
+    return PROMPT_CODEX.trim()
+  }
+
   export function provider(model: Provider.Model) {
     if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
       return [PROMPT_BEAST]
@@ -33,8 +52,13 @@ export namespace SystemPrompt {
     return [PROMPT_DEFAULT]
   }
 
-  export async function environment(model: Provider.Model) {
+  export async function environment(model: Provider.Model, permission: Permission.Ruleset = []) {
     const project = Instance.project
+    const directories = [
+      `  - ${Instance.directory} (working directory)`,
+      ...external(permission).map((item) => `  - ${item} (workspace directory)`),
+    ].join("\n")
+
     return [
       [
         `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
@@ -47,14 +71,7 @@ export namespace SystemPrompt {
         `  Today's date: ${new Date().toDateString()}`,
         `</env>`,
         `<directories>`,
-        `  ${
-          project.vcs === "git" && false
-            ? await Ripgrep.tree({
-                cwd: Instance.directory,
-                limit: 50,
-              })
-            : ""
-        }`,
+        directories,
         `</directories>`,
       ].join("\n"),
     ]

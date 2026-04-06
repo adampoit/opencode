@@ -402,6 +402,16 @@ export const cljfmt: Info = {
   },
 }
 
+export const stylua: Info = {
+  name: "stylua",
+  extensions: [".lua"],
+  async enabled() {
+    const match = Bun.which("stylua")
+    if (!match) return false
+    return [match, "$FILE"]
+  },
+}
+
 export const dfmt: Info = {
   name: "dfmt",
   extensions: [".d"],

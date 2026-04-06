@@ -11,6 +11,8 @@ import path from "path"
 import z from "zod"
 import { Global } from "../global"
 import { Instance } from "../project/instance"
+import { Session } from "../session"
+import { SessionID } from "../session/schema"
 import { Filesystem } from "../util/filesystem"
 import { Log } from "../util/log"
 import { Protected } from "./protected"
@@ -285,6 +287,10 @@ export namespace File {
   }
 
   type Entry = { files: string[]; dirs: string[] }
+  type ExternalCache = { key: string; time: number; value: Entry }
+
+  const EXTERNAL_CACHE_TTL = 2_000
+  const externalCache = new Map<string, ExternalCache>()
 
   const ext = (file: string) => path.extname(file).toLowerCase().slice(1)
   const name = (file: string) => path.basename(file).toLowerCase()
@@ -307,7 +313,9 @@ export namespace File {
 
   const hidden = (item: string) => {
     const normalized = item.replaceAll("\\", "/").replace(/\/+$/, "")
-    return normalized.split("/").some((part) => part.startsWith(".") && part.length > 1)
+    return normalized
+      .split("/")
+      .some((part) => part !== "." && part !== ".." && part.startsWith(".") && part.length > 1)
   }
 
   const sortHiddenLast = (items: string[], prefer: boolean) => {
@@ -319,6 +327,88 @@ export namespace File {
       else visible.push(item)
     }
     return [...visible, ...hiddenItems]
+  }
+
+  function empty(): Entry {
+    return { files: [], dirs: [] }
+  }
+
+  function externalDirectory(pattern: string) {
+    if (!pattern.endsWith("/*") && !pattern.endsWith("\\*")) return
+    const result = pattern.slice(0, -2)
+    if (!path.isAbsolute(result)) return
+    if (result.includes("*") || result.includes("?")) return
+    return path.normalize(result)
+  }
+
+  function traversalOnly(input: string) {
+    const parts = input.replaceAll("\\", "/").split("/").filter(Boolean)
+    if (parts.length === 0) return false
+    return parts.every((part) => part === "..")
+  }
+
+  async function external(sessionID?: string) {
+    if (!sessionID) return empty()
+
+    const session = await Session.get(SessionID.make(sessionID)).catch(() => undefined)
+    if (!session?.permission) {
+      externalCache.delete(sessionID)
+      return empty()
+    }
+
+    const dirs = Array.from(
+      new Set(
+        session.permission
+          .filter((rule) => rule.permission === "external_directory" && rule.action === "allow")
+          .map((rule) => externalDirectory(rule.pattern))
+          .filter((rule): rule is string => Boolean(rule)),
+      ),
+    ).toSorted()
+
+    const key = dirs.join("\0")
+    const now = Date.now()
+    const cached = externalCache.get(sessionID)
+    if (cached && cached.key === key && now - cached.time < EXTERNAL_CACHE_TTL) return cached.value
+
+    if (!dirs.length) {
+      const value = empty()
+      externalCache.set(sessionID, { key, time: now, value })
+      return value
+    }
+
+    const files: string[] = []
+    const folders = new Set<string>()
+
+    for (const dir of dirs) {
+      const stat = await Bun.file(dir)
+        .stat()
+        .catch(() => undefined)
+      if (!stat?.isDirectory()) continue
+
+      const root = path.relative(Instance.directory, dir)
+      if (root && root !== "." && !traversalOnly(root)) folders.add(root + "/")
+
+      for await (const file of Ripgrep.files({ cwd: dir })) {
+        const absolute = path.join(dir, file)
+        const relative = path.relative(Instance.directory, absolute)
+        files.push(relative)
+
+        let current = relative
+        while (true) {
+          const parent = path.dirname(current)
+          if (parent === "." || parent === current || traversalOnly(parent)) break
+          current = parent
+          folders.add(parent + "/")
+        }
+      }
+    }
+
+    const value = {
+      files: Array.from(new Set(files)),
+      dirs: Array.from(folders),
+    }
+    externalCache.set(sessionID, { key, time: now, value })
+    return value
   }
 
   interface State {
@@ -335,6 +425,7 @@ export namespace File {
       limit?: number
       dirs?: boolean
       type?: "file" | "directory"
+      sessionID?: string
     }) => Effect.Effect<string[]>
   }
 
@@ -628,10 +719,13 @@ export namespace File {
         limit?: number
         dirs?: boolean
         type?: "file" | "directory"
+        sessionID?: string
       }) {
         yield* ensure()
         const { cache } = yield* InstanceState.get(state)
-
+        const extra = yield* Effect.promise(() => external(input.sessionID))
+        const files = extra.files.length ? Array.from(new Set([...cache.files, ...extra.files])) : cache.files
+        const dirs = extra.dirs.length ? Array.from(new Set([...cache.dirs, ...extra.dirs])) : cache.dirs
         const query = input.query.trim()
         const limit = input.limit ?? 100
         const kind = input.type ?? (input.dirs === false ? "file" : "all")
@@ -640,13 +734,11 @@ export namespace File {
         const preferHidden = query.startsWith(".") || query.includes("/.")
 
         if (!query) {
-          if (kind === "file") return cache.files.slice(0, limit)
-          return sortHiddenLast(cache.dirs.toSorted(), preferHidden).slice(0, limit)
+          if (kind === "file") return files.slice(0, limit)
+          return sortHiddenLast(dirs.toSorted(), preferHidden).slice(0, limit)
         }
 
-        const items =
-          kind === "file" ? cache.files : kind === "directory" ? cache.dirs : [...cache.files, ...cache.dirs]
-
+        const items = kind === "file" ? files : kind === "directory" ? dirs : [...files, ...dirs]
         const searchLimit = kind === "directory" && !preferHidden ? limit * 20 : limit
         const sorted = fuzzysort.go(query, items, { limit: searchLimit }).map((item) => item.target)
         const output = kind === "directory" ? sortHiddenLast(sorted, preferHidden).slice(0, limit) : sorted
@@ -680,7 +772,13 @@ export namespace File {
     return runPromise((svc) => svc.list(dir))
   }
 
-  export async function search(input: { query: string; limit?: number; dirs?: boolean; type?: "file" | "directory" }) {
+  export async function search(input: {
+    query: string
+    limit?: number
+    dirs?: boolean
+    type?: "file" | "directory"
+    sessionID?: string
+  }) {
     return runPromise((svc) => svc.search(input))
   }
 }
