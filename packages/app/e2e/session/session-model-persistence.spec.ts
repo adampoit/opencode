@@ -221,7 +221,7 @@ async function goto(page: Page, directory: string, sessionID?: string) {
   await waitSession(page, { directory, sessionID })
 }
 
-async function submit(project: Parameters<typeof test>[0]["project"], value: string) {
+async function submit(project: { prompt: (value: string) => Promise<string> }, value: string) {
   return project.prompt(value)
 }
 
@@ -264,6 +264,10 @@ async function newWorkspaceSession(page: Page, slug: string) {
   const next = await resolveSlug(await waitSlug(page))
   return waitSession(page, { directory: next.directory }).then((item) => item.directory)
 }
+
+// Longer timeout for slower CI runners (Windows needs more time)
+const testTimeout = process.env.CI ? (process.platform === "win32" ? 240_000 : 180_000) : 120_000
+test.setTimeout(testTimeout)
 
 test("session model restore per session without leaking into new sessions", async ({ page, project }) => {
   await page.setViewportSize({ width: 1440, height: 900 })

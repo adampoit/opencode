@@ -155,6 +155,8 @@ import type {
   SessionUnshareResponses,
   SessionUpdateErrors,
   SessionUpdateResponses,
+  SessionWorkspaceDirectoryErrors,
+  SessionWorkspaceDirectoryResponses,
   SubtaskPartInput,
   TextPartInput,
   ToolIdsErrors,
@@ -1873,6 +1875,49 @@ export class Session2 extends HeyApiClient {
   }
 
   /**
+   * Add workspace directory
+   *
+   * Add an external directory to the current session workspace.
+   */
+  public workspaceDirectory<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      path?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionWorkspaceDirectoryResponses,
+      SessionWorkspaceDirectoryErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/workspace/directory",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
    * Abort session
    *
    * Abort an active session and stop any ongoing AI processing or command execution.
@@ -2956,6 +3001,7 @@ export class Find extends HeyApiClient {
       dirs?: "true" | "false"
       type?: "file" | "directory"
       limit?: number
+      sessionID?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -2970,6 +3016,7 @@ export class Find extends HeyApiClient {
             { in: "query", key: "dirs" },
             { in: "query", key: "type" },
             { in: "query", key: "limit" },
+            { in: "query", key: "sessionID" },
           ],
         },
       ],
