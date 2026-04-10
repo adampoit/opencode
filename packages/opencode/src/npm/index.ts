@@ -1,5 +1,6 @@
 import semver from "semver"
 import z from "zod"
+import npa from "npm-package-arg"
 import { NamedError } from "@opencode-ai/util/error"
 import { Global } from "../global"
 import { Log } from "../util/log"
@@ -99,8 +100,14 @@ export namespace Npm {
       })
 
     const first = result.edgesOut.values().next().value?.to
-    if (!first) throw new InstallFailedError({ pkg })
-    return resolveEntryPoint(first.name, first.path)
+    if (first) return resolveEntryPoint(first.name, first.path)
+
+    const spec = npa(pkg)
+    if (!spec.name) throw new InstallFailedError({ pkg })
+
+    const item = resolveEntryPoint(spec.name, path.join(dir, "node_modules", spec.name))
+    if (item.entrypoint || (await Filesystem.exists(path.join(item.directory, "package.json")))) return item
+    throw new InstallFailedError({ pkg })
   }
 
   export async function install(dir: string) {
