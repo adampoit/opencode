@@ -595,7 +595,14 @@ async function seedStorage(
         prompt: { enabled: true },
         terminal: { enabled: true, terminals: {} },
       }
-      localStorage.setItem("opencode.global.dat:model", JSON.stringify({ recent: [args.model], user: [], variant: {} }))
+      localStorage.setItem(
+        "opencode.global.dat:model",
+        JSON.stringify({
+          recent: [args.model],
+          user: [{ ...args.model, visibility: "show" }],
+          variant: {},
+        }),
+      )
     },
     { directory: input.directory, serverUrl: origin, extra: input.extra ?? [], model: input.model ?? seedModel },
   )
