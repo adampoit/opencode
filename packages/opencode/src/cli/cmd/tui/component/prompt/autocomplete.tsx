@@ -335,7 +335,7 @@ export function Autocomplete(props: {
         const width = props.anchor().width - 4
         options.push(
           ...sortedFiles.map((item): AutocompleteOption => {
-            const baseDir = (sync.data.path.directory || process.cwd()).replace(/\/+$/, "")
+            const baseDir = (sync.path.directory || process.cwd()).replace(/\/+$/, "")
             const fullPath = `${baseDir}/${item}`
             const urlObj = pathToFileURL(fullPath)
             let filename = item
@@ -392,7 +392,7 @@ export function Autocomplete(props: {
       const command = source.input
       if (!command) return []
 
-      const cwd = (sync.data.path.directory || process.cwd()).replace(/\/+$/, "")
+      const cwd = (sync.path.directory || process.cwd()).replace(/\/+$/, "")
       const query = command.query.trim()
       const session = source.sessionID ? sync.data.session.find((item) => item.id === source.sessionID) : undefined
       const external =
