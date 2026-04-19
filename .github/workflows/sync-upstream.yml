@@ -1,0 +1,50 @@
+name: Sync Upstream Integration
+
+on:
+  schedule:
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Skip push and PR operations.
+        type: boolean
+        required: false
+        default: true
+      upstream_ref:
+        description: Upstream branch ref to rebuild from when release_selector is blank.
+        type: string
+        required: false
+        default: dev
+      release_selector:
+        description: Use `latest`, `prerelease`, or a regex for upstream tags. Leave blank to use upstream_ref.
+        type: string
+        required: false
+        default: latest
+      patch_refs:
+        description: Comma-separated patch branches applied in order.
+        type: string
+        required: false
+        default: patch/stylua, patch/add-directory, patch/ripgrep, patch/generate, patch/sync, patch/ci
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    uses: adampoit/patchlane/.github/workflows/patchlane.yml@13d87932768e5c1766757e8854be30c678d3365c
+    with:
+      upstream_owner: anomalyco
+      upstream_repo: opencode
+      base_branch: dev
+      upstream_ref: ${{ github.event_name == 'workflow_dispatch' && inputs.upstream_ref || 'dev' }}
+      release_selector: ${{ github.event_name == 'workflow_dispatch' && inputs.release_selector || 'latest' }}
+      sync_branch: sync/integration
+      patch_refs: ${{ github.event_name == 'workflow_dispatch' && inputs.patch_refs || 'patch/stylua, patch/add-directory, patch/ripgrep, patch/generate, patch/sync, patch/ci' }}
+      implementation_repository: adampoit/patchlane
+      implementation_ref: 13d87932768e5c1766757e8854be30c678d3365c
+      pr_labels: upstream-sync
+      pr_title: Sync integration branch from {source}
+      dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+    secrets:
+      token: ${{ secrets.FORK_SYNC_TOKEN }}
