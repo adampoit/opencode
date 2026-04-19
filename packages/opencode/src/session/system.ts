@@ -1,3 +1,5 @@
+import path from "path"
+
 import { Context, Effect, Layer } from "effect"
 
 import { Instance } from "../project/instance"
@@ -32,8 +34,24 @@ export function provider(model: Provider.Model) {
   return [PROMPT_DEFAULT]
 }
 
+function external(permission: Permission.Ruleset = []) {
+  return Array.from(
+    new Set(
+      permission
+        .filter((rule) => rule.permission === "external_directory" && rule.action === "allow")
+        .map((rule) => {
+          if (rule.pattern.endsWith("/*") || rule.pattern.endsWith("\\*")) {
+            return path.normalize(rule.pattern.slice(0, -2))
+          }
+        })
+        .filter((rule): rule is string => Boolean(rule))
+        .filter((rule) => path.isAbsolute(rule)),
+    ),
+  )
+}
+
 export interface Interface {
-  readonly environment: (model: Provider.Model) => string[]
+  readonly environment: (model: Provider.Model, permission?: Permission.Ruleset) => string[]
   readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
 }
 
@@ -45,8 +63,14 @@ export const layer = Layer.effect(
     const skill = yield* Skill.Service
 
     return Service.of({
-      environment(model) {
+      environment(model, permission = []) {
         const project = Instance.project
+        const directories = [
+          `  - ${Instance.directory} (working directory)`,
+          `  - ${Instance.worktree} (workspace root)`,
+          ...external(permission).map((item) => `  - ${item} (workspace directory)`),
+        ].join("\n")
+
         return [
           [
             `You are powered by the model named ${model.api.id}. The exact model ID is ${model.providerID}/${model.api.id}`,
@@ -58,6 +82,9 @@ export const layer = Layer.effect(
             `  Platform: ${process.platform}`,
             `  Today's date: ${new Date().toDateString()}`,
             `</env>`,
+            `<directories>`,
+            directories,
+            `</directories>`,
           ].join("\n"),
         ]
       },

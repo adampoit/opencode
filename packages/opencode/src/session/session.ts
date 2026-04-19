@@ -1,3 +1,4 @@
+import fs from "fs/promises"
 import { Slug } from "@opencode-ai/shared/util/slug"
 import path from "path"
 import { BusEvent } from "@/bus/bus-event"
@@ -176,6 +177,17 @@ export const GlobalInfo = Info.extend({
 })
 export type GlobalInfo = z.output<typeof GlobalInfo>
 
+export const WorkspaceDirectoryResult = z
+  .object({
+    added: z.boolean(),
+    directory: z.string(),
+    glob: z.string(),
+    session: Info,
+  })
+  .meta({
+    ref: "SessionWorkspaceDirectoryResult",
+  })
+
 export const CreateInput = z
   .object({
     parentID: SessionID.zod.optional(),
@@ -193,6 +205,7 @@ export const RemoveInput = SessionID.zod
 export const SetTitleInput = z.object({ sessionID: SessionID.zod, title: z.string() })
 export const SetArchivedInput = z.object({ sessionID: SessionID.zod, time: z.number().optional() })
 export const SetPermissionInput = z.object({ sessionID: SessionID.zod, permission: Permission.Ruleset.zod })
+export const WorkspaceDirectoryInput = z.object({ sessionID: SessionID.zod, path: z.string() })
 export const SetRevertInput = z.object({
   sessionID: SessionID.zod,
   revert: Info.shape.revert,
@@ -342,6 +355,10 @@ export interface Interface {
   readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
   readonly setPermission: (input: { sessionID: SessionID; permission: Permission.Ruleset }) => Effect.Effect<void>
+  readonly addWorkspaceDirectory: (input: {
+    sessionID: SessionID
+    path: string
+  }) => Effect.Effect<z.output<typeof WorkspaceDirectoryResult>>
   readonly setRevert: (input: {
     sessionID: SessionID
     revert: Info["revert"]
@@ -589,6 +606,58 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
       yield* patch(input.sessionID, { permission: input.permission, time: { updated: Date.now() } })
     })
 
+    const addWorkspaceDirectory = Effect.fn("Session.addWorkspaceDirectory")(function* (input: z.output<typeof WorkspaceDirectoryInput>) {
+      const session = yield* get(input.sessionID)
+      const expanded =
+        input.path === "~"
+          ? (process.env.HOME ?? input.path)
+          : (input.path.startsWith("~/") || input.path.startsWith("~\\")) && process.env.HOME
+            ? path.join(process.env.HOME, input.path.slice(2))
+            : input.path
+      const target = path.isAbsolute(expanded) ? expanded : path.resolve(session.directory, expanded)
+      const stat = yield* Effect.tryPromise({
+        try: () => Bun.file(target).stat(),
+        catch: () => new NotFoundError({ message: `Directory not found: ${input.path}` }),
+      }).pipe(Effect.option)
+      if (Option.isNone(stat)) throw new NotFoundError({ message: `Directory not found: ${input.path}` })
+      if (!stat.value.isDirectory()) throw new NotFoundError({ message: `Path is not a directory: ${input.path}` })
+      const directory = yield* Effect.promise(() => fs.realpath(target))
+      const glob = path.join(directory, "*")
+
+      const rules = session.permission ?? []
+      const exists = rules.some(
+        (rule) => rule.permission === "external_directory" && rule.action === "allow" && rule.pattern === glob,
+      )
+
+      if (exists) {
+        return {
+          added: false,
+          directory,
+          glob,
+          session,
+        }
+      }
+
+      yield* setPermission({
+        sessionID: input.sessionID,
+        permission: [
+          ...rules,
+          {
+            permission: "external_directory",
+            pattern: glob,
+            action: "allow",
+          },
+        ],
+      })
+
+      return {
+        added: true,
+        directory,
+        glob,
+        session: yield* get(input.sessionID),
+      }
+    })
+
     const setRevert = Effect.fn("Session.setRevert")(function* (input: {
       sessionID: SessionID
       revert: Info["revert"]
@@ -678,6 +747,7 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service> =
       setTitle,
       setArchived,
       setPermission,
+      addWorkspaceDirectory,
       setRevert,
       clearRevert,
       setSummary,

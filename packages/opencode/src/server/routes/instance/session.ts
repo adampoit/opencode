@@ -397,6 +397,45 @@ export const SessionRoutes = lazy(() =>
         }),
     )
     .post(
+      "/:sessionID/workspace/directory",
+      describeRoute({
+        summary: "Add workspace directory",
+        description: "Add an external directory to the current session workspace.",
+        operationId: "session.workspaceDirectory",
+        responses: {
+          200: {
+            description: "Workspace directory added",
+            content: {
+              "application/json": {
+                schema: resolver(Session.WorkspaceDirectoryResult),
+              },
+            },
+          },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          sessionID: Session.WorkspaceDirectoryInput.shape.sessionID,
+        }),
+      ),
+      validator(
+        "json",
+        z.object({
+          path: Session.WorkspaceDirectoryInput.shape.path,
+        }),
+      ),
+      async (c) =>
+        jsonRequest("SessionRoutes.workspaceDirectory", c, function* () {
+          const svc = yield* Session.Service
+          return yield* svc.addWorkspaceDirectory({
+            sessionID: c.req.valid("param").sessionID,
+            path: c.req.valid("json").path,
+          })
+        }),
+    )
+    .post(
       "/:sessionID/abort",
       describeRoute({
         summary: "Abort session",
