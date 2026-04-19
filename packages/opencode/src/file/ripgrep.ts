@@ -272,52 +272,54 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
         }
 
         return path.join(dir, `ripgrep-${VERSION}-${config.platform}`, process.platform === "win32" ? "rg.exe" : "rg")
-      }, Effect.scoped)
+      })
 
       const filepath = yield* Effect.cached(
-        Effect.gen(function* () {
-          const system = yield* Effect.sync(() => which("rg"))
-          if (system && (yield* fs.isFile(system).pipe(Effect.orDie))) return system
+        Effect.scoped(
+          Effect.gen(function* () {
+            const system = yield* Effect.sync(() => which("rg"))
+            if (system && (yield* fs.isFile(system).pipe(Effect.orDie))) return system
 
-          const target = path.join(Global.Path.bin, `rg${process.platform === "win32" ? ".exe" : ""}`)
-          if (yield* fs.isFile(target).pipe(Effect.orDie)) return target
+            const target = path.join(Global.Path.bin, `rg${process.platform === "win32" ? ".exe" : ""}`)
+            if (yield* fs.isFile(target).pipe(Effect.orDie)) return target
 
-          const platformKey = `${process.arch}-${process.platform}` as keyof typeof PLATFORM
-          const config = PLATFORM[platformKey]
-          if (!config) {
-            return yield* Effect.fail(new Error(`unsupported platform for ripgrep: ${platformKey}`))
-          }
+            const platformKey = `${process.arch}-${process.platform}` as keyof typeof PLATFORM
+            const config = PLATFORM[platformKey]
+            if (!config) {
+              return yield* Effect.fail(new Error(`unsupported platform for ripgrep: ${platformKey}`))
+            }
 
-          const filename = `ripgrep-${VERSION}-${config.platform}.${config.extension}`
-          const url = `https://github.com/BurntSushi/ripgrep/releases/download/${VERSION}/${filename}`
-          const archive = path.join(Global.Path.bin, filename)
+            const filename = `ripgrep-${VERSION}-${config.platform}.${config.extension}`
+            const url = `https://github.com/BurntSushi/ripgrep/releases/download/${VERSION}/${filename}`
+            const archive = path.join(Global.Path.bin, filename)
 
-          log.info("downloading ripgrep", { url })
-          yield* fs.ensureDir(Global.Path.bin).pipe(Effect.orDie)
+            log.info("downloading ripgrep", { url })
+            yield* fs.ensureDir(Global.Path.bin).pipe(Effect.orDie)
 
-          const bytes = yield* HttpClientRequest.get(url).pipe(
-            http.execute,
-            Effect.flatMap((response) => response.arrayBuffer),
-            Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))),
-          )
-          if (bytes.byteLength === 0) {
-            return yield* Effect.fail(new Error(`failed to download ripgrep from ${url}`))
-          }
+            const bytes = yield* HttpClientRequest.get(url).pipe(
+              http.execute,
+              Effect.flatMap((response) => response.arrayBuffer),
+              Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))),
+            )
+            if (bytes.byteLength === 0) {
+              return yield* Effect.fail(new Error(`failed to download ripgrep from ${url}`))
+            }
 
-          yield* fs.writeWithDirs(archive, new Uint8Array(bytes)).pipe(Effect.orDie)
-          const extracted = yield* extract(archive, config)
-          const exists = yield* fs.exists(extracted).pipe(Effect.orDie)
-          if (!exists) {
-            return yield* Effect.fail(new Error(`ripgrep archive did not contain executable: ${extracted}`))
-          }
+            yield* fs.writeWithDirs(archive, new Uint8Array(bytes)).pipe(Effect.orDie)
+            const extracted = yield* extract(archive, config)
+            const exists = yield* fs.exists(extracted).pipe(Effect.orDie)
+            if (!exists) {
+              return yield* Effect.fail(new Error(`ripgrep archive did not contain executable: ${extracted}`))
+            }
 
-          yield* fs.copyFile(extracted, target).pipe(Effect.orDie)
-          if (process.platform !== "win32") {
-            yield* fs.chmod(target, 0o755).pipe(Effect.orDie)
-          }
-          yield* fs.remove(archive, { force: true }).pipe(Effect.ignore)
-          return target
-        }),
+            yield* fs.copyFile(extracted, target).pipe(Effect.orDie)
+            if (process.platform !== "win32") {
+              yield* fs.chmod(target, 0o755).pipe(Effect.orDie)
+            }
+            yield* fs.remove(archive, { force: true }).pipe(Effect.ignore)
+            return target
+          }),
+        ),
       )
 
       const check = Effect.fnUntraced(function* (cwd: string) {
