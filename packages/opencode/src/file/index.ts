@@ -4,6 +4,7 @@ import { InstanceState } from "@/effect"
 import { AppFileSystem } from "@opencode-ai/shared/filesystem"
 import { Git } from "@/git"
 import { Effect, Layer, Context, Scope } from "effect"
+import { Option } from "effect"
 import * as Stream from "effect/Stream"
 import { formatPatch, structuredPatch } from "diff"
 import fuzzysort from "fuzzysort"
@@ -12,6 +13,7 @@ import path from "path"
 import z from "zod"
 import { Global } from "../global"
 import { Instance } from "../project/instance"
+import * as Session from "../session/session"
 import { Log } from "../util"
 import { Protected } from "./protected"
 import { Ripgrep } from "./ripgrep"
@@ -306,7 +308,21 @@ function shouldEncode(mimeType: string) {
 
 const hidden = (item: string) => {
   const normalized = item.replaceAll("\\", "/").replace(/\/+$/, "")
-  return normalized.split("/").some((part) => part.startsWith(".") && part.length > 1)
+  return normalized.split("/").some((part) => part !== "." && part !== ".." && part.startsWith(".") && part.length > 1)
+}
+
+const externalDirectory = (pattern: string) => {
+  if (!pattern.endsWith("/*") && !pattern.endsWith("\\*")) return
+  const result = pattern.slice(0, -2)
+  if (!path.isAbsolute(result)) return
+  if (result.includes("*") || result.includes("?")) return
+  return path.normalize(result)
+}
+
+const traversalOnly = (input: string) => {
+  const parts = input.replaceAll("\\", "/").split("/").filter(Boolean)
+  if (parts.length === 0) return false
+  return parts.every((part) => part === "..")
 }
 
 const sortHiddenLast = (items: string[], prefer: boolean) => {
@@ -334,6 +350,7 @@ export interface Interface {
     limit?: number
     dirs?: boolean
     type?: "file" | "directory"
+    sessionID?: string
   }) => Effect.Effect<string[]>
 }
 
@@ -345,6 +362,7 @@ export const layer = Layer.effect(
     const appFs = yield* AppFileSystem.Service
     const rg = yield* Ripgrep.Service
     const git = yield* Git.Service
+    const sessions = yield* Session.Service
     const scope = yield* Scope.Scope
 
     const state = yield* InstanceState.make<State>(
@@ -619,14 +637,74 @@ export const layer = Layer.effect(
       })
     })
 
+    const external = Effect.fn("File.external")(function* (sessionID?: string) {
+      if (!sessionID) return { files: [], dirs: [] } as Entry
+
+      const session = yield* sessions.get(sessionID as Session.Info["id"]).pipe(Effect.option)
+      if (Option.isNone(session) || !session.value.permission) return { files: [], dirs: [] } as Entry
+
+      const dirs = Array.from(
+        new Set(
+          session.value.permission
+            .filter((rule) => rule.permission === "external_directory" && rule.action === "allow")
+            .map((rule) => externalDirectory(rule.pattern))
+            .filter((rule): rule is string => Boolean(rule)),
+        ),
+      )
+
+      if (!dirs.length) return { files: [], dirs: [] } as Entry
+
+      const files: string[] = []
+      const folders = new Set<string>()
+
+      for (const dir of dirs) {
+        const stat = yield* Effect.tryPromise({
+          try: () => Bun.file(dir).stat(),
+          catch: (err) => err,
+        }).pipe(Effect.option)
+        if (Option.isNone(stat) || !stat.value.isDirectory()) continue
+
+        const root = path.relative(Instance.directory, dir)
+        if (root && root !== "." && !traversalOnly(root)) folders.add(root + "/")
+
+        const items = yield* rg.files({ cwd: dir }).pipe(
+          Stream.runCollect,
+          Effect.map((chunk) => [...chunk]),
+        )
+
+        for (const file of items) {
+          const absolute = path.join(dir, file)
+          const relative = path.relative(Instance.directory, absolute)
+          files.push(relative)
+
+          let current = relative
+          while (true) {
+            const parent = path.dirname(current)
+            if (parent === "." || parent === current || traversalOnly(parent)) break
+            current = parent
+            folders.add(parent + "/")
+          }
+        }
+      }
+
+      return {
+        files: Array.from(new Set(files)),
+        dirs: Array.from(folders),
+      }
+    })
+
     const search = Effect.fn("File.search")(function* (input: {
       query: string
       limit?: number
       dirs?: boolean
       type?: "file" | "directory"
+      sessionID?: string
     }) {
       yield* ensure()
       const { cache } = yield* InstanceState.get(state)
+      const extra = yield* external(input.sessionID).pipe(Effect.orElseSucceed(() => ({ files: [], dirs: [] })))
+      const files = extra.files.length ? Array.from(new Set([...cache.files, ...extra.files])) : cache.files
+      const dirs = extra.dirs.length ? Array.from(new Set([...cache.dirs, ...extra.dirs])) : cache.dirs
 
       const query = input.query.trim()
       const limit = input.limit ?? 100
@@ -636,11 +714,11 @@ export const layer = Layer.effect(
       const preferHidden = query.startsWith(".") || query.includes("/.")
 
       if (!query) {
-        if (kind === "file") return cache.files.slice(0, limit)
-        return sortHiddenLast(cache.dirs.toSorted(), preferHidden).slice(0, limit)
+        if (kind === "file") return files.slice(0, limit)
+        return sortHiddenLast(dirs.toSorted(), preferHidden).slice(0, limit)
       }
 
-      const items = kind === "file" ? cache.files : kind === "directory" ? cache.dirs : [...cache.files, ...cache.dirs]
+      const items = kind === "file" ? files : kind === "directory" ? dirs : [...files, ...dirs]
 
       const searchLimit = kind === "directory" && !preferHidden ? limit * 20 : limit
       const sorted = fuzzysort.go(query, items, { limit: searchLimit }).map((item) => item.target)
@@ -659,6 +737,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(Ripgrep.defaultLayer),
   Layer.provide(AppFileSystem.defaultLayer),
   Layer.provide(Git.defaultLayer),
+  Layer.provide(Session.defaultLayer),
 )
 
 export * as File from "."

@@ -54,21 +54,6 @@ export type EventGlobalDisposed = {
   }
 }
 
-export type EventFileEdited = {
-  type: "file.edited"
-  properties: {
-    file: string
-  }
-}
-
-export type EventFileWatcherUpdated = {
-  type: "file.watcher.updated"
-  properties: {
-    file: string
-    event: "add" | "change" | "unlink"
-  }
-}
-
 export type EventLspClientDiagnostics = {
   type: "lsp.client.diagnostics"
   properties: {
@@ -227,6 +212,21 @@ export type EventSessionError = {
       | StructuredOutputError
       | ContextOverflowError
       | ApiError
+  }
+}
+
+export type EventFileEdited = {
+  type: "file.edited"
+  properties: {
+    file: string
+  }
+}
+
+export type EventFileWatcherUpdated = {
+  type: "file.watcher.updated"
+  properties: {
+    file: string
+    event: "add" | "change" | "unlink"
   }
 }
 
@@ -1113,8 +1113,6 @@ export type GlobalEvent = {
     | EventServerInstanceDisposed
     | EventServerConnected
     | EventGlobalDisposed
-    | EventFileEdited
-    | EventFileWatcherUpdated
     | EventLspClientDiagnostics
     | EventLspUpdated
     | EventInstallationUpdated
@@ -1124,6 +1122,8 @@ export type GlobalEvent = {
     | EventPermissionReplied
     | EventSessionDiff
     | EventSessionError
+    | EventFileEdited
+    | EventFileWatcherUpdated
     | EventQuestionAsked
     | EventQuestionReplied
     | EventQuestionRejected
@@ -1901,6 +1901,13 @@ export type McpResource = {
   client: string
 }
 
+export type SessionWorkspaceDirectoryResult = {
+  added: boolean
+  directory: string
+  glob: string
+  session: Session
+}
+
 export type TextPartInput = {
   id?: string
   type: "text"
@@ -2039,8 +2046,6 @@ export type Event =
   | EventServerInstanceDisposed
   | EventServerConnected
   | EventGlobalDisposed
-  | EventFileEdited
-  | EventFileWatcherUpdated
   | EventLspClientDiagnostics
   | EventLspUpdated
   | EventInstallationUpdated
@@ -2050,6 +2055,8 @@ export type Event =
   | EventPermissionReplied
   | EventSessionDiff
   | EventSessionError
+  | EventFileEdited
+  | EventFileWatcherUpdated
   | EventQuestionAsked
   | EventQuestionReplied
   | EventQuestionRejected
@@ -3571,6 +3578,43 @@ export type SessionForkResponses = {
 
 export type SessionForkResponse = SessionForkResponses[keyof SessionForkResponses]
 
+export type SessionWorkspaceDirectoryData = {
+  body?: {
+    path: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/workspace/directory"
+}
+
+export type SessionWorkspaceDirectoryErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionWorkspaceDirectoryError = SessionWorkspaceDirectoryErrors[keyof SessionWorkspaceDirectoryErrors]
+
+export type SessionWorkspaceDirectoryResponses = {
+  /**
+   * Workspace directory added
+   */
+  200: SessionWorkspaceDirectoryResult
+}
+
+export type SessionWorkspaceDirectoryResponse =
+  SessionWorkspaceDirectoryResponses[keyof SessionWorkspaceDirectoryResponses]
+
 export type SessionAbortData = {
   body?: never
   path: {
@@ -4656,6 +4700,7 @@ export type FindFilesData = {
     dirs?: "true" | "false"
     type?: "file" | "directory"
     limit?: number
+    sessionID?: string
   }
   url: "/find/file"
 }

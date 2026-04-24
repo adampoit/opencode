@@ -65,6 +65,7 @@ export const FileRoutes = lazy(() =>
           dirs: z.enum(["true", "false"]).optional(),
           type: z.enum(["file", "directory"]).optional(),
           limit: z.coerce.number().int().min(1).max(200).optional(),
+          sessionID: z.string().optional(),
         }),
       ),
       async (c) =>
@@ -76,6 +77,7 @@ export const FileRoutes = lazy(() =>
             limit: query.limit ?? 10,
             dirs: query.dirs !== "false",
             type: query.type,
+            sessionID: query.sessionID,
           })
         }),
     )
