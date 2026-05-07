@@ -70,6 +70,9 @@ export const RevertPayload = Schema.Struct(Struct.omit(SessionRevert.RevertInput
 export const PermissionResponsePayload = Schema.Struct({
   response: Permission.Reply,
 })
+export const WorkspaceDirectoryPayload = Schema.Struct({
+  path: Schema.String,
+})
 
 export const SessionPaths = {
   list: root,
@@ -85,6 +88,7 @@ export const SessionPaths = {
   update: `${root}/:sessionID`,
   fork: `${root}/:sessionID/fork`,
   abort: `${root}/:sessionID/abort`,
+  workspaceDirectory: `${root}/:sessionID/workspace/directory`,
   share: `${root}/:sessionID/share`,
   init: `${root}/:sessionID/init`,
   summarize: `${root}/:sessionID/summarize`,
@@ -256,6 +260,26 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.abort",
             summary: "Abort session",
             description: "Abort an active session and stop any ongoing AI processing or command execution.",
+          }),
+        ),
+        HttpApiEndpoint.post("workspaceDirectory", SessionPaths.workspaceDirectory, {
+          params: { sessionID: SessionID },
+          payload: WorkspaceDirectoryPayload,
+          success: described(
+            Schema.Struct({
+              added: Schema.Boolean,
+              directory: Schema.String,
+              glob: Schema.String,
+              session: Session.Info,
+            }),
+            "Workspace directory added",
+          ),
+          error: [HttpApiError.BadRequest, HttpApiError.NotFound],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.workspaceDirectory",
+            summary: "Add workspace directory",
+            description: "Add an external directory to the current session workspace.",
           }),
         ),
         HttpApiEndpoint.post("init", SessionPaths.init, {

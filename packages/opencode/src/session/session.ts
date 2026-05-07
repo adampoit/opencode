@@ -1,3 +1,4 @@
+import fs from "fs/promises"
 import { Slug } from "@opencode-ai/core/util/slug"
 import path from "path"
 import { BusEvent } from "@/bus/bus-event"
@@ -214,6 +215,21 @@ export const GlobalInfo = Schema.Struct({
   .annotate({ identifier: "GlobalSession" })
   .pipe(withStatics((s) => ({ zod: zod(s) })))
 export type GlobalInfo = Types.DeepMutable<Schema.Schema.Type<typeof GlobalInfo>>
+
+export const WorkspaceDirectoryResult = Schema.Struct({
+  added: Schema.Boolean,
+  directory: Schema.String,
+  glob: Schema.String,
+  session: Info,
+})
+  .annotate({ identifier: "SessionWorkspaceDirectoryResult" })
+  .pipe(withStatics((s) => ({ zod: zod(s) })))
+export type WorkspaceDirectoryResult = Types.DeepMutable<Schema.Schema.Type<typeof WorkspaceDirectoryResult>>
+
+export const WorkspaceDirectoryInput = Schema.Struct({
+  sessionID: SessionID,
+  path: Schema.String,
+})
 
 export const CreateInput = Schema.optional(
   Schema.Struct({
@@ -439,6 +455,10 @@ export interface Interface {
   readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
   readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
   readonly setPermission: (input: { sessionID: SessionID; permission: Permission.Ruleset }) => Effect.Effect<void>
+  readonly addWorkspaceDirectory: (input: {
+    sessionID: SessionID
+    path: string
+  }) => Effect.Effect<WorkspaceDirectoryResult, NotFound>
   readonly setRevert: (input: {
     sessionID: SessionID
     revert: Info["revert"]
@@ -703,6 +723,61 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
       yield* patch(input.sessionID, { permission: input.permission, time: { updated: Date.now() } })
     })
 
+    const addWorkspaceDirectory = Effect.fn("Session.addWorkspaceDirectory")(function* (input: {
+      sessionID: SessionID
+      path: string
+    }) {
+      const session = yield* get(input.sessionID)
+      const expanded =
+        input.path === "~"
+          ? (process.env.HOME ?? input.path)
+          : (input.path.startsWith("~/") || input.path.startsWith("~\\")) && process.env.HOME
+            ? path.join(process.env.HOME, input.path.slice(2))
+            : input.path
+      const target = path.isAbsolute(expanded) ? expanded : path.resolve(session.directory, expanded)
+      const stat = yield* Effect.tryPromise({
+        try: () => Bun.file(target).stat(),
+        catch: () => new NotFoundError({ message: `Directory not found: ${input.path}` }),
+      }).pipe(Effect.option)
+      if (Option.isNone(stat)) throw new NotFoundError({ message: `Directory not found: ${input.path}` })
+      if (!stat.value.isDirectory()) throw new NotFoundError({ message: `Path is not a directory: ${input.path}` })
+      const directory = yield* Effect.promise(() => fs.realpath(target))
+      const glob = path.join(directory, "*")
+
+      const rules = session.permission ?? []
+      const exists = rules.some(
+        (rule) => rule.permission === "external_directory" && rule.action === "allow" && rule.pattern === glob,
+      )
+
+      if (exists) {
+        return {
+          added: false,
+          directory,
+          glob,
+          session,
+        }
+      }
+
+      yield* setPermission({
+        sessionID: input.sessionID,
+        permission: [
+          ...rules,
+          {
+            permission: "external_directory",
+            pattern: glob,
+            action: "allow",
+          },
+        ],
+      })
+
+      return {
+        added: true,
+        directory,
+        glob,
+        session: yield* get(input.sessionID),
+      }
+    })
+
     const setRevert = Effect.fn("Session.setRevert")(function* (input: {
       sessionID: SessionID
       revert: Info["revert"]
@@ -789,6 +864,7 @@ export const layer: Layer.Layer<Service, never, Bus.Service | Storage.Service | 
       setTitle,
       setArchived,
       setPermission,
+      addWorkspaceDirectory,
       setRevert,
       clearRevert,
       setSummary,
