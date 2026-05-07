@@ -1,0 +1,59 @@
+name: Sync Upstream Integration
+
+on:
+  schedule:
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Skip push operations.
+        type: boolean
+        required: false
+        default: true
+      upstream_ref:
+        description: Upstream branch ref to rebuild from when release_selector is blank.
+        type: string
+        required: false
+        default: dev
+      release_selector:
+        description: Use `latest`, `prerelease`, or a regex for upstream tags. Leave blank to use upstream_ref.
+        type: string
+        required: false
+        default: latest
+      patch_refs:
+        description: Comma-separated patch branches applied in order.
+        type: string
+        required: false
+        default: patch/stylua, patch/add-directory, patch/fork-ci, patch/local-dev
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.FORK_SYNC_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run patchlane sync
+        env:
+          GITHUB_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+        run: |
+          npx patchlane sync \
+            --upstream-owner=anomalyco \
+            --upstream-repo=opencode \
+            --base-branch=dev \
+            --sync-branch=sync/integration \
+            --upstream-ref="${{ github.event_name == 'workflow_dispatch' && inputs.upstream_ref || 'dev' }}" \
+            --release-selector="${{ github.event_name == 'workflow_dispatch' && inputs.release_selector || 'latest' }}" \
+            --patch-refs="${{ github.event_name == 'workflow_dispatch' && inputs.patch_refs || 'patch/stylua, patch/add-directory, patch/fork-ci, patch/local-dev' }}" \
+            ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == 'true' && '--dry-run' || '' }}
