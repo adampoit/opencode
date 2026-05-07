@@ -42,7 +42,7 @@ import { iife } from "@/util/iife"
 import { Locale } from "@/util/locale"
 import { formatDuration } from "@/util/format"
 import { createColors, createFrames } from "../../ui/spinner.ts"
-import { useDialog } from "@tui/ui/dialog"
+import { useDialog, type DialogContext } from "@tui/ui/dialog"
 import { DialogProvider as DialogProviderConnect } from "../dialog-provider"
 import { DialogAlert } from "../../ui/dialog-alert"
 import { useToast } from "../../ui/toast"
@@ -62,6 +62,29 @@ import { type WorkspaceStatus } from "../workspace-label"
 import { useCommandPalette } from "../../context/command-palette"
 import { useBindings, useCommandShortcut, useLeaderActive, useOpencodeKeymap } from "../../keymap"
 import { useTuiConfig } from "../../context/tui-config"
+
+function directoryCommand(input: string) {
+  if (!input.startsWith("/")) return
+  const value = input.slice(1)
+  if (value === "add-directory" || value === "workspace-add") {
+    return {
+      command: value,
+      path: "",
+    }
+  }
+  if (value.startsWith("add-directory ")) {
+    return {
+      command: "add-directory",
+      path: value.slice("add-directory ".length),
+    }
+  }
+  if (value.startsWith("workspace-add ")) {
+    return {
+      command: "workspace-add",
+      path: value.slice("workspace-add ".length),
+    }
+  }
+}
 
 export type PromptProps = {
   sessionID?: string
@@ -490,6 +513,25 @@ export function Prompt(props: PromptProps) {
             })
             setStore("interrupt", 0)
           }
+          dialog.clear()
+        },
+      },
+      {
+        title: "Add workspace directory",
+        value: "session.workspace.directory.add",
+        category: "Session",
+        slash: {
+          name: "add-directory",
+          aliases: ["workspace-add"],
+        },
+        onSelect: (dialog: DialogContext) => {
+          const text = "/add-directory "
+          input.setText(text)
+          setStore("prompt", {
+            input: text,
+            parts: [],
+          })
+          input.gotoBufferEnd()
           dialog.clear()
         },
       },
@@ -1018,12 +1060,83 @@ export function Prompt(props: PromptProps) {
       void exit()
       return true
     }
+
+    const directory = directoryCommand(trimmed)
+    const createSession = () => sdk.client.session.create({}).then((x) => x.data!.id)
+
+    if (directory) {
+      const target = directory.path.trim()
+      if (!target) {
+        toast.show({
+          variant: "warning",
+          message: "Type a directory path after /add-directory",
+        })
+        return
+      }
+
+      const sessionID = props.sessionID ? props.sessionID : await createSession()
+
+      await sdk.client.session
+        .workspaceDirectory({
+          sessionID,
+          path: target,
+        })
+        .then((result) => {
+          const data = result.data
+          if (!data) {
+            const message =
+              result.error && typeof result.error === "object" && "message" in result.error
+                ? String(result.error.message)
+                : "Failed to add workspace directory"
+            toast.show({
+              variant: "error",
+              message,
+            })
+            return
+          }
+
+          toast.show({
+            variant: data.added ? "success" : "info",
+            message: data.added
+              ? `Workspace directory added: ${data.directory}`
+              : `Workspace directory already added: ${data.directory}`,
+          })
+        })
+        .catch((error) => {
+          toast.show({
+            variant: "error",
+            message: error instanceof Error ? error.message : "Failed to add workspace directory",
+          })
+        })
+
+      history.append({
+        ...store.prompt,
+        mode: store.mode,
+      })
+      input.extmarks.clear()
+      setStore("prompt", {
+        input: "",
+        parts: [],
+      })
+      setStore("extmarkToPartIndex", new Map())
+      props.onSubmit?.()
+
+      if (!props.sessionID)
+        setTimeout(() => {
+          route.navigate({
+            type: "session",
+            sessionID,
+          })
+        }, 50)
+      input.clear()
+      return
+    }
+
     const selectedModel = local.model.current()
     if (!selectedModel) {
       void promptModelWarning()
       return false
     }
-
     const workspaceSession = props.sessionID ? sync.session.get(props.sessionID) : undefined
     const workspaceID = workspaceSession?.workspaceID
     const workspaceStatus = workspaceID ? (project.workspace.status(workspaceID) ?? "error") : undefined

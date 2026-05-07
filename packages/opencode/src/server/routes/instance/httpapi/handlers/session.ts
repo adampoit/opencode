@@ -36,6 +36,7 @@ import {
   ShellPayload,
   SummarizePayload,
   UpdatePayload,
+  WorkspaceDirectoryPayload,
 } from "../groups/session"
 import * as SessionError from "./session-errors"
 
@@ -197,6 +198,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const abort = Effect.fn("SessionHttpApi.abort")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* promptSvc.cancel(ctx.params.sessionID)
       return true
+    })
+
+    const workspaceDirectory = Effect.fn("SessionHttpApi.workspaceDirectory")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof WorkspaceDirectoryPayload.Type
+    }) {
+      return yield* session
+        .addWorkspaceDirectory({ sessionID: ctx.params.sessionID, path: ctx.payload.path })
+        .pipe(Effect.mapError(() => new HttpApiError.NotFound({})))
     })
 
     const init = Effect.fn("SessionHttpApi.init")(function* (ctx: {
@@ -375,6 +385,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("update", update)
       .handle("fork", fork)
       .handle("abort", abort)
+      .handle("workspaceDirectory", workspaceDirectory)
       .handle("init", init)
       .handle("share", share)
       .handle("unshare", unshare)

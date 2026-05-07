@@ -1,7 +1,8 @@
-import type { BoxRenderable, TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
+import type { BoxRenderable, TextareaRenderable, ScrollBoxRenderable, KeyEvent } from "@opentui/core"
 import { pathToFileURL } from "bun"
-import fuzzysort from "fuzzysort"
+import fs from "fs/promises"
 import path from "path"
+import fuzzysort from "fuzzysort"
 import { firstBy } from "remeda"
 import { createMemo, createResource, createEffect, onMount, onCleanup, Index, Show, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -18,6 +19,7 @@ import { Locale } from "@/util/locale"
 import type { PromptInfo } from "./history"
 import { useFrecency } from "./frecency"
 import { useBindings } from "../../keymap"
+import { directoryPath } from "./directory"
 
 function removeLineRange(input: string) {
   const hashIndex = input.lastIndexOf("#")
@@ -51,8 +53,85 @@ function extractLineRange(input: string) {
   }
 }
 
+function slashDirectory(input: string) {
+  if (!input.startsWith("/")) return
+  const value = input.slice(1)
+  if (value === "add-directory" || value === "workspace-add") {
+    return {
+      command: value,
+      query: "",
+    }
+  }
+  if (value.startsWith("add-directory ")) {
+    return {
+      command: "add-directory",
+      query: value.slice("add-directory ".length),
+    }
+  }
+  if (value.startsWith("workspace-add ")) {
+    return {
+      command: "workspace-add",
+      query: value.slice("workspace-add ".length),
+    }
+  }
+}
+
+function fromRule(pattern: string) {
+  if (!pattern.endsWith("/*") && !pattern.endsWith("\\*")) return
+  const result = pattern.slice(0, -2)
+  if (!path.isAbsolute(result)) return
+  if (result.includes("*") || result.includes("?")) return
+  return path.normalize(result)
+}
+
+function expand(input: string) {
+  const home = process.env.HOME
+  if (input === "~") return home ?? input
+  if (home && (input.startsWith("~/") || input.startsWith("~\\"))) {
+    return path.join(home, input.slice(2))
+  }
+  return input
+}
+
+function absolute(input: string, cwd: string) {
+  const value = expand(input)
+  if (path.isAbsolute(value)) return path.normalize(value)
+  return path.resolve(cwd, value)
+}
+
+async function suggest(input: string, cwd: string) {
+  const query = input.trim()
+  const value = query ? absolute(query, cwd) : cwd
+  const prefix = query.endsWith(path.sep) || query.endsWith("/") ? "" : path.basename(value)
+  const dir = prefix ? path.dirname(value) : value
+  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
+
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.name.toLowerCase().includes(prefix.toLowerCase()))
+    .map((entry) => path.join(dir, entry.name))
+    .filter((entry) => entry.trim().length > 0)
+    .slice(0, 80)
+}
+
+async function defaults(cwd: string) {
+  const parent = path.dirname(cwd)
+  const siblings = await fs.readdir(parent, { withFileTypes: true }).catch(() => [])
+  return [
+    ...siblings
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.join(parent, entry.name))
+      .filter((entry) => path.normalize(entry) !== path.normalize(cwd)),
+  ]
+}
+
+function pathLike(input: string) {
+  return input.includes("/") || input.includes("\\") || input.startsWith(".") || input.startsWith("~")
+}
+
 export type AutocompleteRef = {
   onInput: (value: string) => void
+  onKeyDown: (e: KeyEvent) => void
   visible: false | "@" | "/"
 }
 
@@ -143,6 +222,11 @@ export function Autocomplete(props: {
   createEffect(() => {
     const next = filter()
     setSearch(next ? next : "")
+  })
+
+  const directorySlash = createMemo(() => {
+    if (!store.visible || store.visible !== "/") return
+    return slashDirectory(props.value)
   })
 
   // When the filter changes due to how TUI works, the mousemove might still be triggered
@@ -297,6 +381,7 @@ export function Autocomplete(props: {
       // Get files from SDK
       const result = await sdk.client.find.files({
         query: baseQuery,
+        sessionID: props.sessionID,
       })
 
       const options: AutocompleteOption[] = []
@@ -333,6 +418,88 @@ export function Autocomplete(props: {
       }
 
       return options
+    },
+    {
+      initialValue: [],
+    },
+  )
+
+  const [directories] = createResource(
+    () => ({
+      input: directorySlash(),
+      sessionID: props.sessionID,
+    }),
+    async (source) => {
+      const command = source.input
+      if (!command) return []
+
+      const cwd = (sync.path.directory || process.cwd()).replace(/\/+$/, "")
+      const query = command.query.trim()
+      const session = source.sessionID ? sync.data.session.find((item) => item.id === source.sessionID) : undefined
+      const external =
+        session?.permission
+          ?.filter((item) => item.permission === "external_directory" && item.action === "allow")
+          .map((item) => fromRule(item.pattern))
+          .filter((item): item is string => Boolean(item)) ?? []
+      const externalSet = new Set(external.map((item) => path.normalize(item)))
+
+      const sibling = await defaults(cwd)
+
+      const fromFS = query
+        ? pathLike(query)
+          ? await suggest(query, cwd)
+          : [...(await suggest(query, cwd)), ...sibling]
+        : sibling
+
+      const fromSearch =
+        query && !pathLike(query)
+          ? await sdk.client.find
+              .files({
+                query,
+                type: "directory",
+                sessionID: source.sessionID,
+                limit: 80,
+              })
+              .then((result) => (result.error || !result.data ? [] : result.data.map((item) => absolute(item, cwd))))
+              .catch(() => [])
+          : []
+
+      const all = Array.from(
+        new Set(
+          [...fromFS, ...fromSearch].map((item) => path.normalize(item)).filter((item) => item.trim().length > 0),
+        ),
+      ).filter((item) => !externalSet.has(item))
+
+      const ranked =
+        query && !pathLike(query)
+          ? fuzzysort
+              .go(query, all, {
+                keys: [(item: string) => directoryPath(item, cwd, query), (item: string) => path.basename(item)],
+                limit: 80,
+              })
+              .map((item) => item.obj)
+          : all
+
+      const width = props.anchor().width - 4
+      const result = ranked.map((item) => {
+        const value = directoryPath(item, cwd, query)
+        return {
+          display: Locale.truncateMiddle(value, width),
+          value,
+          path: item,
+          onSelect: () => {
+            const text = `/${command.command} ${value}`
+            props.input().setText(text)
+            props.input().cursorOffset = Bun.stringWidth(text)
+            props.setPrompt((draft) => {
+              draft.input = text
+              draft.parts = []
+            })
+          },
+        }
+      })
+
+      return result
     },
     {
       initialValue: [],
@@ -430,9 +597,19 @@ export function Autocomplete(props: {
     const filesValue = files()
     const agentsValue = agents()
     const commandsValue = commands()
+    const directoriesValue = directories()
+    const slash = directorySlash()
 
     const mixed: AutocompleteOption[] =
-      store.visible === "@" ? [...agentsValue, ...(filesValue || []), ...mcpResources()] : [...commandsValue]
+      store.visible === "@"
+        ? [...agentsValue, ...(filesValue || []), ...mcpResources()]
+        : slash
+          ? [...directoriesValue]
+          : [...commandsValue]
+
+    if (slash) {
+      return mixed
+    }
 
     const searchValue = search()
 
@@ -591,7 +768,8 @@ export function Autocomplete(props: {
 
   function hide() {
     const text = props.input().plainText
-    if (store.visible === "/" && !text.endsWith(" ") && text.startsWith("/")) {
+    const slash = slashDirectory(text)
+    if (store.visible === "/" && !slash && !text.endsWith(" ") && text.startsWith("/")) {
       const cursor = props.input().logicalCursor
       props.input().deleteRange(0, 0, cursor.row, cursor.col)
       // Sync the prompt store immediately since onContentChange is async
@@ -618,13 +796,14 @@ export function Autocomplete(props: {
       },
       onInput(value) {
         if (store.visible) {
+          const slash = slashDirectory(value)
           if (
             // Typed text before the trigger
             props.input().cursorOffset <= store.index ||
             // There is a space between the trigger and the cursor
-            props.input().getTextRange(store.index, props.input().cursorOffset).match(/\s/) ||
+            (!slash && props.input().getTextRange(store.index, props.input().cursorOffset).match(/\s/)) ||
             // "/<command>" is not the sole content
-            (store.visible === "/" && value.match(/^\S+\s+\S+\s*$/))
+            (store.visible === "/" && !slash && value.match(/^\S+\s+\S+\s*$/))
           ) {
             hide()
           }
@@ -642,6 +821,13 @@ export function Autocomplete(props: {
           return
         }
 
+        const slash = slashDirectory(value)
+        if (slash) {
+          show("/")
+          setStore("index", 0)
+          return
+        }
+
         // Check for "@" trigger - find the nearest "@" before cursor with no whitespace between
         const text = value.slice(0, offset)
         const idx = text.lastIndexOf("@")
@@ -652,6 +838,71 @@ export function Autocomplete(props: {
         if ((before === undefined || /\s/.test(before)) && !between.match(/\s/)) {
           show("@")
           setStore("index", idx)
+        }
+      },
+      onKeyDown(e: KeyEvent) {
+        if (store.visible) {
+          const name = e.name?.toLowerCase()
+          const ctrlOnly = e.ctrl && !e.meta && !e.shift
+          const isNavUp = name === "up" || (ctrlOnly && name === "p")
+          const isNavDown = name === "down" || (ctrlOnly && name === "n")
+
+          if (isNavUp) {
+            setStore("input", "keyboard")
+            move(-1)
+            e.preventDefault()
+            return
+          }
+          if (isNavDown) {
+            setStore("input", "keyboard")
+            move(1)
+            e.preventDefault()
+            return
+          }
+          if (name === "escape") {
+            hide()
+            e.preventDefault()
+            return
+          }
+          if (name === "return") {
+            const slash = slashDirectory(props.input().plainText)
+            if (slash) {
+              const selected = options()[store.selected]
+              const before = props.input().plainText
+              selected?.onSelect?.()
+              hide()
+              if (props.input().plainText !== before) {
+                e.preventDefault()
+              }
+              return
+            }
+            select()
+            e.preventDefault()
+            return
+          }
+          if (name === "tab") {
+            const selected = options()[store.selected]
+            if (selected?.isDirectory) {
+              expandDirectory()
+            } else {
+              select()
+            }
+            e.preventDefault()
+            return
+          }
+        }
+        if (!store.visible) {
+          if (e.name === "@") {
+            const cursorOffset = props.input().cursorOffset
+            const charBeforeCursor =
+              cursorOffset === 0 ? undefined : props.input().getTextRange(cursorOffset - 1, cursorOffset)
+            const canTrigger = charBeforeCursor === undefined || charBeforeCursor === "" || /\s/.test(charBeforeCursor)
+            if (canTrigger) show("@")
+          }
+
+          if (e.name === "/") {
+            if (props.input().cursorOffset === 0) show("/")
+          }
         }
       },
     })

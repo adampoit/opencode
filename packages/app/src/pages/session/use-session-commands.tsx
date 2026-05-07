@@ -1,3 +1,4 @@
+
 import { useNavigate } from "@solidjs/router"
 import { useCommand, type CommandOption } from "@/context/command"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
@@ -16,6 +17,7 @@ import { useTerminal } from "@/context/terminal"
 import { showToast } from "@opencode-ai/ui/toast"
 import { findLast } from "@opencode-ai/core/util/array"
 import { createSessionTabs } from "@/pages/session/helpers"
+import { DialogSelectDirectory } from "@/components/dialog-select-directory"
 import { extractPromptFromParts } from "@/utils/prompt"
 import { UserMessage } from "@opencode-ai/sdk/v2"
 import { useSessionLayout } from "@/pages/session/session-layout"
@@ -286,6 +288,69 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     })
   }
 
+  const addDirectory = async () => {
+    const sessionID = params.id
+    if (!sessionID) return
+
+    const selected = await new Promise<string | undefined>((resolve) => {
+      const done = (result: string | string[] | null) => {
+        if (Array.isArray(result)) {
+          resolve(result[0])
+          return
+        }
+        resolve(result ?? undefined)
+      }
+      dialog.show(
+        () => <DialogSelectDirectory title={language.t("command.session.directory.add")} onSelect={done} />,
+        () => done(null),
+      )
+    })
+
+    if (!selected) return
+
+    await sdk.client.session
+      .workspaceDirectory({
+        sessionID,
+        path: selected,
+      })
+      .then((res) => {
+        const data = res.data
+        if (!data) {
+          showToast({
+            title: language.t("toast.session.directory.failed.title"),
+            description: language.t("common.requestFailed"),
+            variant: "error",
+          })
+          return
+        }
+
+        if (!data.added) {
+          showToast({
+            title: language.t("toast.session.directory.exists.title"),
+            description: language.t("toast.session.directory.exists.description", {
+              directory: data.directory,
+            }),
+          })
+          return
+        }
+
+        showToast({
+          title: language.t("toast.session.directory.added.title"),
+          description: language.t("toast.session.directory.added.description", {
+            directory: data.directory,
+          }),
+          variant: "success",
+        })
+      })
+      .catch((error: Error) => {
+        showToast({
+          title: language.t("toast.session.directory.failed.title"),
+          description: error instanceof Error ? error.message : language.t("common.requestFailed"),
+          variant: "error",
+        })
+      })
+  }
+
   const undo = async () => {
     const sessionID = params.id
     if (!sessionID) return
@@ -387,6 +452,14 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       keybind: "mod+shift+s",
       slash: "new",
       onSelect: () => navigate(`/${params.dir}/session`),
+    }),
+    sessionCommand({
+      id: "session.directory.add",
+      title: language.t("command.session.directory.add"),
+      description: language.t("command.session.directory.add.description"),
+      slash: "add-directory",
+      disabled: !params.id,
+      onSelect: addDirectory,
     }),
     sessionCommand({
       id: "session.undo",

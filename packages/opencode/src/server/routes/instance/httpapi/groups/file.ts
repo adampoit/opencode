@@ -30,6 +30,7 @@ export const FindFileQuery = Schema.Struct({
   limit: Schema.optional(
     Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(200)),
   ),
+  sessionID: Schema.optional(Schema.String),
 })
 
 export const FindSymbolQuery = Schema.Struct({

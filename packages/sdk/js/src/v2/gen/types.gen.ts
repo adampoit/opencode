@@ -6,8 +6,6 @@ export type ClientOptions = {
 
 export type Event =
   | EventServerInstanceDisposed
-  | EventFileEdited
-  | EventFileWatcherUpdated
   | EventLspClientDiagnostics
   | EventLspUpdated
   | EventMessagePartDelta
@@ -15,6 +13,8 @@ export type Event =
   | EventPermissionReplied
   | EventSessionDiff
   | EventSessionError
+  | EventFileEdited
+  | EventFileWatcherUpdated
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
   | EventQuestionAsked
@@ -779,8 +779,6 @@ export type GlobalEvent = {
   workspace?: string
   payload:
     | EventServerInstanceDisposed
-    | EventFileEdited
-    | EventFileWatcherUpdated
     | EventLspClientDiagnostics
     | EventLspUpdated
     | EventMessagePartDelta
@@ -788,6 +786,8 @@ export type GlobalEvent = {
     | EventPermissionReplied
     | EventSessionDiff
     | EventSessionError
+    | EventFileEdited
+    | EventFileWatcherUpdated
     | EventInstallationUpdated
     | EventInstallationUpdateAvailable
     | EventQuestionAsked
@@ -2338,23 +2338,6 @@ export type EventServerInstanceDisposed = {
   }
 }
 
-export type EventFileEdited = {
-  id: string
-  type: "file.edited"
-  properties: {
-    file: string
-  }
-}
-
-export type EventFileWatcherUpdated = {
-  id: string
-  type: "file.watcher.updated"
-  properties: {
-    file: string
-    event: "add" | "change" | "unlink"
-  }
-}
-
 export type EventLspClientDiagnostics = {
   id: string
   type: "lsp.client.diagnostics"
@@ -2422,6 +2405,23 @@ export type EventSessionError = {
       | StructuredOutputError
       | ContextOverflowError
       | ApiError
+  }
+}
+
+export type EventFileEdited = {
+  id: string
+  type: "file.edited"
+  properties: {
+    file: string
+  }
+}
+
+export type EventFileWatcherUpdated = {
+  id: string
+  type: "file.watcher.updated"
+  properties: {
+    file: string
+    event: "add" | "change" | "unlink"
   }
 }
 
@@ -3408,6 +3408,15 @@ export type GlobalHealthData = {
   url: "/global/health"
 }
 
+export type GlobalHealthErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalHealthError = GlobalHealthErrors[keyof GlobalHealthErrors]
+
 export type GlobalHealthResponses = {
   /**
    * Health information
@@ -3427,6 +3436,15 @@ export type GlobalEventData = {
   url: "/global/event"
 }
 
+export type GlobalEventErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalEventError = GlobalEventErrors[keyof GlobalEventErrors]
+
 export type GlobalEventResponses = {
   /**
    * Event stream
@@ -3442,6 +3460,15 @@ export type GlobalConfigGetData = {
   query?: never
   url: "/global/config"
 }
+
+export type GlobalConfigGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalConfigGetError = GlobalConfigGetErrors[keyof GlobalConfigGetErrors]
 
 export type GlobalConfigGetResponses = {
   /**
@@ -3483,6 +3510,15 @@ export type GlobalDisposeData = {
   query?: never
   url: "/global/dispose"
 }
+
+export type GlobalDisposeErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalDisposeError = GlobalDisposeErrors[keyof GlobalDisposeErrors]
 
 export type GlobalDisposeResponses = {
   /**
@@ -3538,6 +3574,15 @@ export type EventSubscribeData = {
   url: "/event"
 }
 
+export type EventSubscribeErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type EventSubscribeError = EventSubscribeErrors[keyof EventSubscribeErrors]
+
 export type EventSubscribeResponses = {
   /**
    * Event stream
@@ -3556,6 +3601,15 @@ export type ConfigGetData = {
   }
   url: "/config"
 }
+
+export type ConfigGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigGetError = ConfigGetErrors[keyof ConfigGetErrors]
 
 export type ConfigGetResponses = {
   /**
@@ -3604,6 +3658,15 @@ export type ConfigProvidersData = {
   url: "/config/providers"
 }
 
+export type ConfigProvidersErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigProvidersError = ConfigProvidersErrors[keyof ConfigProvidersErrors]
+
 export type ConfigProvidersResponses = {
   /**
    * List of providers
@@ -3636,7 +3699,6 @@ export type ExperimentalConsoleGetErrors = {
 }
 
 export type ExperimentalConsoleGetError = ExperimentalConsoleGetErrors[keyof ExperimentalConsoleGetErrors]
-
 export type ExperimentalConsoleGetResponses = {
   /**
    * Active Console provider metadata
@@ -3804,6 +3866,15 @@ export type WorktreeListData = {
   url: "/experimental/worktree"
 }
 
+export type WorktreeListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type WorktreeListError = WorktreeListErrors[keyof WorktreeListErrors]
+
 export type WorktreeListResponses = {
   /**
    * List of worktree directories
@@ -3885,6 +3956,15 @@ export type ExperimentalSessionListData = {
   url: "/experimental/session"
 }
 
+export type ExperimentalSessionListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalSessionListError = ExperimentalSessionListErrors[keyof ExperimentalSessionListErrors]
+
 export type ExperimentalSessionListResponses = {
   /**
    * List of sessions
@@ -3903,6 +3983,15 @@ export type ExperimentalResourceListData = {
   }
   url: "/experimental/resource"
 }
+
+export type ExperimentalResourceListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalResourceListError = ExperimentalResourceListErrors[keyof ExperimentalResourceListErrors]
 
 export type ExperimentalResourceListResponses = {
   /**
@@ -3926,6 +4015,15 @@ export type FindTextData = {
   }
   url: "/find"
 }
+
+export type FindTextErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type FindTextError = FindTextErrors[keyof FindTextErrors]
 
 export type FindTextResponses = {
   /**
@@ -3962,9 +4060,19 @@ export type FindFilesData = {
     dirs?: "true" | "false"
     type?: "file" | "directory"
     limit?: number
+    sessionID?: string
   }
   url: "/find/file"
 }
+
+export type FindFilesErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type FindFilesError = FindFilesErrors[keyof FindFilesErrors]
 
 export type FindFilesResponses = {
   /**
@@ -3986,6 +4094,15 @@ export type FindSymbolsData = {
   url: "/find/symbol"
 }
 
+export type FindSymbolsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type FindSymbolsError = FindSymbolsErrors[keyof FindSymbolsErrors]
+
 export type FindSymbolsResponses = {
   /**
    * Symbols
@@ -4005,6 +4122,15 @@ export type FileListData = {
   }
   url: "/file"
 }
+
+export type FileListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type FileListError = FileListErrors[keyof FileListErrors]
 
 export type FileListResponses = {
   /**
@@ -4026,6 +4152,15 @@ export type FileReadData = {
   url: "/file/content"
 }
 
+export type FileReadErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type FileReadError = FileReadErrors[keyof FileReadErrors]
+
 export type FileReadResponses = {
   /**
    * File content
@@ -4044,6 +4179,15 @@ export type FileStatusData = {
   }
   url: "/file/status"
 }
+
+export type FileStatusErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type FileStatusError = FileStatusErrors[keyof FileStatusErrors]
 
 export type FileStatusResponses = {
   /**
@@ -4064,6 +4208,15 @@ export type InstanceDisposeData = {
   url: "/instance/dispose"
 }
 
+export type InstanceDisposeErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type InstanceDisposeError = InstanceDisposeErrors[keyof InstanceDisposeErrors]
+
 export type InstanceDisposeResponses = {
   /**
    * Instance disposed
@@ -4083,6 +4236,15 @@ export type PathGetData = {
   url: "/path"
 }
 
+export type PathGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type PathGetError = PathGetErrors[keyof PathGetErrors]
+
 export type PathGetResponses = {
   /**
    * Path
@@ -4101,6 +4263,15 @@ export type VcsGetData = {
   }
   url: "/vcs"
 }
+
+export type VcsGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type VcsGetError = VcsGetErrors[keyof VcsGetErrors]
 
 export type VcsGetResponses = {
   /**
@@ -4140,6 +4311,15 @@ export type VcsDiffData = {
   }
   url: "/vcs/diff"
 }
+
+export type VcsDiffErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type VcsDiffError = VcsDiffErrors[keyof VcsDiffErrors]
 
 export type VcsDiffResponses = {
   /**
@@ -4211,6 +4391,15 @@ export type CommandListData = {
   url: "/command"
 }
 
+export type CommandListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type CommandListError = CommandListErrors[keyof CommandListErrors]
+
 export type CommandListResponses = {
   /**
    * List of commands
@@ -4230,6 +4419,15 @@ export type AppAgentsData = {
   url: "/agent"
 }
 
+export type AppAgentsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type AppAgentsError = AppAgentsErrors[keyof AppAgentsErrors]
+
 export type AppAgentsResponses = {
   /**
    * List of agents
@@ -4248,6 +4446,15 @@ export type AppSkillsData = {
   }
   url: "/skill"
 }
+
+export type AppSkillsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type AppSkillsError = AppSkillsErrors[keyof AppSkillsErrors]
 
 export type AppSkillsResponses = {
   /**
@@ -4273,6 +4480,15 @@ export type LspStatusData = {
   url: "/lsp"
 }
 
+export type LspStatusErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type LspStatusError = LspStatusErrors[keyof LspStatusErrors]
+
 export type LspStatusResponses = {
   /**
    * LSP server status
@@ -4292,6 +4508,15 @@ export type FormatterStatusData = {
   url: "/formatter"
 }
 
+export type FormatterStatusErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type FormatterStatusError = FormatterStatusErrors[keyof FormatterStatusErrors]
+
 export type FormatterStatusResponses = {
   /**
    * Formatter status
@@ -4310,6 +4535,15 @@ export type McpStatusData = {
   }
   url: "/mcp"
 }
+
+export type McpStatusErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type McpStatusError = McpStatusErrors[keyof McpStatusErrors]
 
 export type McpStatusResponses = {
   /**
@@ -4369,6 +4603,10 @@ export type McpAuthRemoveData = {
 
 export type McpAuthRemoveErrors = {
   /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
    * Not found
    */
   404: NotFoundError
@@ -4401,7 +4639,7 @@ export type McpAuthStartData = {
 
 export type McpAuthStartErrors = {
   /**
-   * McpUnsupportedOAuthError
+   * McpUnsupportedOAuthError | BadRequest
    */
   400: McpUnsupportedOAuthError
   /**
@@ -4474,7 +4712,7 @@ export type McpAuthAuthenticateData = {
 
 export type McpAuthAuthenticateErrors = {
   /**
-   * McpUnsupportedOAuthError
+   * McpUnsupportedOAuthError | BadRequest
    */
   400: McpUnsupportedOAuthError
   /**
@@ -4506,6 +4744,15 @@ export type McpConnectData = {
   url: "/mcp/{name}/connect"
 }
 
+export type McpConnectErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type McpConnectError = McpConnectErrors[keyof McpConnectErrors]
+
 export type McpConnectResponses = {
   /**
    * MCP server connected successfully
@@ -4527,6 +4774,15 @@ export type McpDisconnectData = {
   url: "/mcp/{name}/disconnect"
 }
 
+export type McpDisconnectErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type McpDisconnectError = McpDisconnectErrors[keyof McpDisconnectErrors]
+
 export type McpDisconnectResponses = {
   /**
    * MCP server disconnected successfully
@@ -4545,6 +4801,15 @@ export type ProjectListData = {
   }
   url: "/project"
 }
+
+export type ProjectListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ProjectListError = ProjectListErrors[keyof ProjectListErrors]
 
 export type ProjectListResponses = {
   /**
@@ -4565,6 +4830,15 @@ export type ProjectCurrentData = {
   url: "/project/current"
 }
 
+export type ProjectCurrentErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ProjectCurrentError = ProjectCurrentErrors[keyof ProjectCurrentErrors]
+
 export type ProjectCurrentResponses = {
   /**
    * Current project information
@@ -4583,6 +4857,15 @@ export type ProjectInitGitData = {
   }
   url: "/project/git/init"
 }
+
+export type ProjectInitGitErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ProjectInitGitError = ProjectInitGitErrors[keyof ProjectInitGitErrors]
 
 export type ProjectInitGitResponses = {
   /**
@@ -4650,6 +4933,15 @@ export type PtyShellsData = {
   url: "/pty/shells"
 }
 
+export type PtyShellsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type PtyShellsError = PtyShellsErrors[keyof PtyShellsErrors]
+
 export type PtyShellsResponses = {
   /**
    * List of shells
@@ -4672,6 +4964,15 @@ export type PtyListData = {
   }
   url: "/pty"
 }
+
+export type PtyListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type PtyListError = PtyListErrors[keyof PtyListErrors]
 
 export type PtyListResponses = {
   /**
@@ -4732,7 +5033,11 @@ export type PtyRemoveData = {
 
 export type PtyRemoveErrors = {
   /**
-   * NotFoundError
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
    */
   404: NotFoundError
 }
@@ -4761,6 +5066,10 @@ export type PtyGetData = {
 }
 
 export type PtyGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
   /**
    * NotFoundError
    */
@@ -4828,6 +5137,10 @@ export type PtyConnectTokenData = {
 
 export type PtyConnectTokenErrors = {
   /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
    * Forbidden
    */
   403: EffectHttpApiErrorForbidden
@@ -4860,6 +5173,15 @@ export type QuestionListData = {
   }
   url: "/question"
 }
+
+export type QuestionListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type QuestionListError = QuestionListErrors[keyof QuestionListErrors]
 
 export type QuestionListResponses = {
   /**
@@ -4953,6 +5275,15 @@ export type PermissionListData = {
   url: "/permission"
 }
 
+export type PermissionListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type PermissionListError = PermissionListErrors[keyof PermissionListErrors]
+
 export type PermissionListResponses = {
   /**
    * List of pending permissions
@@ -5009,6 +5340,15 @@ export type ProviderListData = {
   url: "/provider"
 }
 
+export type ProviderListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ProviderListError = ProviderListErrors[keyof ProviderListErrors]
+
 export type ProviderListResponses = {
   /**
    * List of providers
@@ -5033,6 +5373,15 @@ export type ProviderAuthData = {
   }
   url: "/provider/auth"
 }
+
+export type ProviderAuthErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ProviderAuthError2 = ProviderAuthErrors[keyof ProviderAuthErrors]
 
 export type ProviderAuthResponses = {
   /**
@@ -5134,6 +5483,15 @@ export type SessionListData = {
   }
   url: "/session"
 }
+
+export type SessionListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SessionListError = SessionListErrors[keyof SessionListErrors]
 
 export type SessionListResponses = {
   /**
@@ -5402,6 +5760,15 @@ export type SessionDiffData = {
   url: "/session/{sessionID}/diff"
 }
 
+export type SessionDiffErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SessionDiffError = SessionDiffErrors[keyof SessionDiffErrors]
+
 export type SessionDiffResponses = {
   /**
    * Successfully retrieved diff
@@ -5591,6 +5958,10 @@ export type SessionForkData = {
 
 export type SessionForkErrors = {
   /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
    * NotFoundError
    */
   404: NotFoundError
@@ -5640,6 +6011,48 @@ export type SessionAbortResponses = {
 }
 
 export type SessionAbortResponse = SessionAbortResponses[keyof SessionAbortResponses]
+
+export type SessionWorkspaceDirectoryData = {
+  body?: {
+    path: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/workspace/directory"
+}
+
+export type SessionWorkspaceDirectoryErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionWorkspaceDirectoryError = SessionWorkspaceDirectoryErrors[keyof SessionWorkspaceDirectoryErrors]
+
+export type SessionWorkspaceDirectoryResponses = {
+  /**
+   * Workspace directory added
+   */
+  200: {
+    added: boolean
+    directory: string
+    glob: string
+    session: Session
+  }
+}
+
+export type SessionWorkspaceDirectoryResponse =
+  SessionWorkspaceDirectoryResponses[keyof SessionWorkspaceDirectoryResponses]
 
 export type SessionInitData = {
   body?: {
@@ -6121,6 +6534,15 @@ export type SyncStartData = {
   url: "/sync/start"
 }
 
+export type SyncStartErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SyncStartError = SyncStartErrors[keyof SyncStartErrors]
+
 export type SyncStartResponses = {
   /**
    * Workspace sync started
@@ -6294,6 +6716,15 @@ export type V2SessionPromptData = {
   url: "/api/session/{sessionID}/prompt"
 }
 
+export type V2SessionPromptErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type V2SessionPromptError = V2SessionPromptErrors[keyof V2SessionPromptErrors]
+
 export type V2SessionPromptResponses = {
   /**
    * Session.Message
@@ -6314,6 +6745,15 @@ export type V2SessionCompactData = {
   }
   url: "/api/session/{sessionID}/compact"
 }
+
+export type V2SessionCompactErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type V2SessionCompactError = V2SessionCompactErrors[keyof V2SessionCompactErrors]
 
 export type V2SessionCompactResponses = {
   /**
@@ -6336,6 +6776,15 @@ export type V2SessionWaitData = {
   url: "/api/session/{sessionID}/wait"
 }
 
+export type V2SessionWaitErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type V2SessionWaitError = V2SessionWaitErrors[keyof V2SessionWaitErrors]
+
 export type V2SessionWaitResponses = {
   /**
    * <No Content>
@@ -6356,6 +6805,15 @@ export type V2SessionContextData = {
   }
   url: "/api/session/{sessionID}/context"
 }
+
+export type V2SessionContextErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type V2SessionContextError = V2SessionContextErrors[keyof V2SessionContextErrors]
 
 export type V2SessionContextResponses = {
   /**
@@ -6442,6 +6900,15 @@ export type TuiOpenHelpData = {
   url: "/tui/open-help"
 }
 
+export type TuiOpenHelpErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type TuiOpenHelpError = TuiOpenHelpErrors[keyof TuiOpenHelpErrors]
+
 export type TuiOpenHelpResponses = {
   /**
    * Help dialog opened successfully
@@ -6460,6 +6927,15 @@ export type TuiOpenSessionsData = {
   }
   url: "/tui/open-sessions"
 }
+
+export type TuiOpenSessionsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type TuiOpenSessionsError = TuiOpenSessionsErrors[keyof TuiOpenSessionsErrors]
 
 export type TuiOpenSessionsResponses = {
   /**
@@ -6480,6 +6956,15 @@ export type TuiOpenThemesData = {
   url: "/tui/open-themes"
 }
 
+export type TuiOpenThemesErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type TuiOpenThemesError = TuiOpenThemesErrors[keyof TuiOpenThemesErrors]
+
 export type TuiOpenThemesResponses = {
   /**
    * Theme dialog opened successfully
@@ -6498,6 +6983,15 @@ export type TuiOpenModelsData = {
   }
   url: "/tui/open-models"
 }
+
+export type TuiOpenModelsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type TuiOpenModelsError = TuiOpenModelsErrors[keyof TuiOpenModelsErrors]
 
 export type TuiOpenModelsResponses = {
   /**
@@ -6518,6 +7012,15 @@ export type TuiSubmitPromptData = {
   url: "/tui/submit-prompt"
 }
 
+export type TuiSubmitPromptErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type TuiSubmitPromptError = TuiSubmitPromptErrors[keyof TuiSubmitPromptErrors]
+
 export type TuiSubmitPromptResponses = {
   /**
    * Prompt submitted successfully
@@ -6536,6 +7039,15 @@ export type TuiClearPromptData = {
   }
   url: "/tui/clear-prompt"
 }
+
+export type TuiClearPromptErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type TuiClearPromptError = TuiClearPromptErrors[keyof TuiClearPromptErrors]
 
 export type TuiClearPromptResponses = {
   /**
@@ -6590,6 +7102,15 @@ export type TuiShowToastData = {
   }
   url: "/tui/show-toast"
 }
+
+export type TuiShowToastErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type TuiShowToastError = TuiShowToastErrors[keyof TuiShowToastErrors]
 
 export type TuiShowToastResponses = {
   /**
@@ -6675,6 +7196,15 @@ export type TuiControlNextData = {
   url: "/tui/control/next"
 }
 
+export type TuiControlNextErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type TuiControlNextError = TuiControlNextErrors[keyof TuiControlNextErrors]
+
 export type TuiControlNextResponses = {
   /**
    * Next TUI request
@@ -6697,6 +7227,15 @@ export type TuiControlResponseData = {
   url: "/tui/control/response"
 }
 
+export type TuiControlResponseErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type TuiControlResponseError = TuiControlResponseErrors[keyof TuiControlResponseErrors]
+
 export type TuiControlResponseResponses = {
   /**
    * Response submitted successfully
@@ -6715,6 +7254,16 @@ export type ExperimentalWorkspaceAdapterListData = {
   }
   url: "/experimental/workspace/adapter"
 }
+
+export type ExperimentalWorkspaceAdapterListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalWorkspaceAdapterListError =
+  ExperimentalWorkspaceAdapterListErrors[keyof ExperimentalWorkspaceAdapterListErrors]
 
 export type ExperimentalWorkspaceAdapterListResponses = {
   /**
@@ -6739,6 +7288,15 @@ export type ExperimentalWorkspaceListData = {
   }
   url: "/experimental/workspace"
 }
+
+export type ExperimentalWorkspaceListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalWorkspaceListError = ExperimentalWorkspaceListErrors[keyof ExperimentalWorkspaceListErrors]
 
 export type ExperimentalWorkspaceListResponses = {
   /**
@@ -6814,6 +7372,16 @@ export type ExperimentalWorkspaceStatusData = {
   }
   url: "/experimental/workspace/status"
 }
+
+export type ExperimentalWorkspaceStatusErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ExperimentalWorkspaceStatusError =
+  ExperimentalWorkspaceStatusErrors[keyof ExperimentalWorkspaceStatusErrors]
 
 export type ExperimentalWorkspaceStatusResponses = {
   /**
@@ -6906,6 +7474,10 @@ export type PtyConnectData = {
 }
 
 export type PtyConnectErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
   /**
    * Forbidden
    */
