@@ -216,10 +216,10 @@ describe("Worktree", () => {
             const list = yield* svc.list()
             const directory = yield* Effect.promise(() => fs.realpath(target).catch(() => target))
 
-            expect(list).toContainEqual({
+            expect(list.map((item) => ({ ...item, directory: normalize(item.directory) }))).toContainEqual({
               name: path.basename(parent),
               branch,
-              directory: directory.toLowerCase(),
+              directory: normalize(directory),
             })
 
             yield* svc.remove({ directory: target })
