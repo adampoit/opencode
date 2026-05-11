@@ -24,7 +24,7 @@ on:
         description: Comma-separated patch branches applied in order.
         type: string
         required: false
-        default: patch/stylua, patch/add-directory, patch/fork-ci, patch/local-dev
+        default: patch/stylua, patch/add-directory, patch/macos-worktree-test, patch/fork-ci, patch/local-dev
 
 permissions:
   contents: write
@@ -55,5 +55,5 @@ jobs:
             --sync-branch=sync/integration \
             --upstream-ref="${{ github.event_name == 'workflow_dispatch' && inputs.upstream_ref || 'dev' }}" \
             --release-selector="${{ github.event_name == 'workflow_dispatch' && inputs.release_selector || 'latest' }}" \
-            --patch-refs="${{ github.event_name == 'workflow_dispatch' && inputs.patch_refs || 'patch/stylua, patch/add-directory, patch/fork-ci, patch/local-dev' }}" \
+            --patch-refs="${{ github.event_name == 'workflow_dispatch' && inputs.patch_refs || 'patch/stylua, patch/add-directory, patch/macos-worktree-test, patch/fork-ci, patch/local-dev' }}" \
             ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == 'true' && '--dry-run' || '' }}
