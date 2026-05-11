@@ -136,7 +136,6 @@ jobs:
           artifact-pattern: static-nix-cache-${{ matrix.name }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-release-tag: nix-cache-${{ matrix.name }}
-          signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
 
   generate_nix_cache:
     name: generate nix cache site
