@@ -67,10 +67,8 @@ jobs:
         include:
           - name: linux
             os: ubuntu-latest
-            cache_path: linux
           - name: darwin
             os: macos-latest
-            cache_path: darwin
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -80,7 +78,7 @@ jobs:
 
       - name: Configure repository cache
         env:
-          CACHE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ matrix.cache_path }}
+          CACHE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
           CACHE_KEY: ${{ vars.NIX_CACHE_PUBLIC_KEY }}
         run: |
           set -euo pipefail
@@ -131,21 +129,13 @@ jobs:
       - name: Setup Nix
         uses: nixbuild/nix-quick-install-action@v34
 
-      - name: Generate Linux cache site
+      - name: Generate cache site
         uses: adampoit/static-nix-cache/deploy@master
         with:
-          artifact-pattern: static-nix-cache-linux
+          artifact-pattern: static-nix-cache-*
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-release-tag: nix-cache-linux
-          static: ./site/linux
-
-      - name: Generate Darwin cache site
-        uses: adampoit/static-nix-cache/deploy@master
-        with:
-          artifact-pattern: static-nix-cache-darwin
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-release-tag: nix-cache-darwin
-          static: ./site/darwin
+          github-release-tags: nix-cache-linux,nix-cache-darwin
+          static: ./site
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
