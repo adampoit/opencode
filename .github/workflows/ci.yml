@@ -113,11 +113,37 @@ jobs:
           signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
 
   publish_nix_cache:
-    name: publish nix cache
+    name: publish nix cache (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
     if: github.repository == 'adampoit/opencode' && github.event_name == 'push' && github.ref == 'refs/heads/dev'
     needs: [typecheck, unit, nix_build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+          - name: darwin
+    permissions:
+      contents: write
+    steps:
+      - name: Setup Nix
+        uses: nixbuild/nix-quick-install-action@v34
+
+      - name: Deploy to per-platform release
+        uses: adampoit/static-nix-cache/deploy@master
+        with:
+          artifact-pattern: static-nix-cache-${{ matrix.name }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-release-tag: nix-cache-${{ matrix.name }}
+          signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
+
+  generate_nix_cache:
+    name: generate nix cache site
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.repository == 'adampoit/opencode' && github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs: publish_nix_cache
     permissions:
       contents: write
       pages: write
@@ -126,13 +152,9 @@ jobs:
       name: github-pages
       url: ${{ steps.pages.outputs.page_url }}
     steps:
-      - name: Setup Nix
-        uses: nixbuild/nix-quick-install-action@v34
-
       - name: Generate cache site
-        uses: adampoit/static-nix-cache/deploy@master
+        uses: adampoit/static-nix-cache/generate-static@master
         with:
-          artifact-pattern: static-nix-cache-*
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-release-tags: nix-cache-linux,nix-cache-darwin
           static: ./site
