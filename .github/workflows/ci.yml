@@ -132,9 +132,8 @@ jobs:
       - name: Deploy cache
         uses: adampoit/static-nix-cache/deploy@master
         with:
-          artifact-pattern: static-nix-cache-*
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          signing-key: ${{ secrets.NIX_CACHE_SIGNING_KEY }}
+          github-release-tags: nix-cache-linux,nix-cache-darwin
           static: ./site
 
       - name: Upload GitHub Pages artifact
